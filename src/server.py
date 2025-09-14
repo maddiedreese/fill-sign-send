@@ -444,6 +444,131 @@ async def debug_post_endpoint(request: Request):
     return {"message": "Debug POST endpoint", "client_ip": str(request.client.host), "body": body.decode() if body else "No body"}
     return {"message": "Doc Filling + E-Signing MCP Server", "status": "running"}
 
+@app.post("/mcp")
+async def mcp_endpoint(request: Request):
+    """MCP protocol endpoint for tool calls."""
+    try:
+        body = await request.body()
+        data = json.loads(body) if body else {}
+        
+        logger.info(f"📡 MCP POST request from {request.client.host}")
+        logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
+        logger.info(f"🔍 DEBUG: Body: {data}")
+        
+        # Handle MCP protocol messages
+        if data.get("method") == "initialize":
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "result": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {
+                            "listChanged": True
+                        }
+                    },
+                    "serverInfo": {
+                        "name": "fill-sign-send-mcp-server",
+                        "version": "1.0.0"
+                    }
+                }
+            })
+        
+        elif data.get("method") == "tools/list":
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "result": {
+                    "tools": [
+                        {
+                            "name": "getenvelope",
+                            "description": "Get envelope information",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"}
+                                },
+                                "required": ["envelope_id"]
+                            }
+                        },
+                        {
+                            "name": "fill_envelope",
+                            "description": "Fill PDF form fields",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "form_data": {"type": "object", "description": "Form field data"}
+                                },
+                                "required": ["pdf_url", "form_data"]
+                            }
+                        },
+                        {
+                            "name": "sign_envelope",
+                            "description": "Send document for signature",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "signer_email": {"type": "string", "description": "Signer email address"},
+                                    "signer_name": {"type": "string", "description": "Signer name"}
+                                },
+                                "required": ["pdf_url", "signer_email", "signer_name"]
+                            }
+                        }
+                    ]
+                }
+            })
+        
+        elif data.get("method") == "tools/call":
+            tool_name = data.get("params", {}).get("name")
+            tool_args = data.get("params", {}).get("arguments", {})
+            
+            if tool_name in TOOL_HANDLERS:
+                result = TOOL_HANDLERS[tool_name](tool_args)
+                return JSONResponse(content={
+                    "jsonrpc": "2.0",
+                    "id": data.get("id"),
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": str(result)
+                            }
+                        ]
+                    }
+                })
+            else:
+                return JSONResponse(content={
+                    "jsonrpc": "2.0",
+                    "id": data.get("id"),
+                    "error": {
+                        "code": -32601,
+                        "message": f"Tool '{tool_name}' not found"
+                    }
+                })
+        
+        else:
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "error": {
+                    "code": -32601,
+                    "message": f"Method '{data.get('method')}' not found"
+                }
+            })
+            
+    except Exception as e:
+        logger.error(f"❌ MCP POST error: {e}")
+        return JSONResponse(content={
+            "jsonrpc": "2.0",
+            "id": data.get("id") if 'data' in locals() else None,
+            "error": {
+                "code": -32603,
+                "message": str(e)
+            }
+        }, status_code=500)
+
 @app.get("/sse")
 async def sse_endpoint(request: Request, tool: str = None, args: str = None):
     """SSE endpoint for MCP tool support."""

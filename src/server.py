@@ -601,8 +601,8 @@ def handle_fill_document_fields(args: Dict[str, Any]) -> Dict[str, Any]:
         
         if USE_REAL_APIS:
             try:
-                from esign_docusign import fill_document_fields
-                result = fill_document_fields(envelope_id, field_data)
+                from esign_docusign import fill_envelope_docusign
+                result = fill_envelope_docusign(envelope_id, field_data)
                 
                 if result.get("success"):
                     return {
@@ -740,7 +740,6 @@ def handle_extract_access_code(args: Dict[str, Any]) -> Dict[str, Any]:
             r'security code[:\s]+([A-Z0-9]{4,8})',  # "security code: ABC123"
             r'code[:\s]+([A-Z0-9]{4,8})',  # "code: ABC123"
             r'Your.*?code[:\s]+([A-Z0-9]{4,8})',  # "Your access code is: ABC123"
-            r'([A-Z0-9]{4,8})',  # Just 4-8 alphanumeric characters (fallback)
         ]
         
         access_codes = []
@@ -782,6 +781,96 @@ def handle_extract_access_code(args: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"❌ extract_access_code error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to extract access code"}
+
+def handle_extract_envelope_and_access_code(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle extracting both envelope ID and access code from DocuSign email content."""
+    try:
+        email_content = args.get("email_content", "")
+        
+        if not email_content:
+            return {"success": False, "error": "email_content is required", "message": "Please provide email_content"}
+        
+        logger.info(f"🔍 extract_envelope_and_access_code called with email_content length: {len(email_content)}")
+        
+        import re
+        
+        # Patterns for DocuSign envelope IDs (typically UUIDs)
+        envelope_patterns = [
+            r'envelope[:\s]+([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})',  # "envelope: 12345678-1234-1234-1234-123456789012"
+            r'envelope[:\s]+([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})',  # "envelope: 12345678-1234-1234-1234-123456789012"
+            r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})',  # Just UUID pattern
+        ]
+        
+        # Patterns for DocuSign access codes
+        access_code_patterns = [
+            r'access code[:\s]+([A-Z0-9]{4,8})',  # "access code: ABC123"
+            r'security code[:\s]+([A-Z0-9]{4,8})',  # "security code: ABC123"
+            r'code[:\s]+([A-Z0-9]{4,8})',  # "code: ABC123"
+            r'Your.*?code[:\s]+([A-Z0-9]{4,8})',  # "Your access code is: ABC123"
+        ]
+        
+        # Extract envelope IDs
+        envelope_ids = []
+        for pattern in envelope_patterns:
+            matches = re.findall(pattern, email_content, re.IGNORECASE)
+            envelope_ids.extend(matches)
+        
+        # Extract access codes
+        access_codes = []
+        for pattern in access_code_patterns:
+            matches = re.findall(pattern, email_content, re.IGNORECASE)
+            access_codes.extend(matches)
+        
+        # Filter and clean results
+        unique_envelope_ids = list(set(envelope_ids))
+        unique_access_codes = list(set(access_codes))
+        
+        # Filter access codes
+        filtered_access_codes = [code for code in unique_access_codes 
+                               if len(code) >= 4 and len(code) <= 8 
+                               and code.isalnum() 
+                               and code.upper() not in ['ACCESS', 'CODE', 'DOCUSIGN', 'PLEASE', 'DOCUMENT', 'SIGNING']]
+        
+        result = {
+            "success": True,
+            "envelope_ids": unique_envelope_ids,
+            "access_codes": filtered_access_codes,
+            "message": "Extraction completed"
+        }
+        
+        if unique_envelope_ids and filtered_access_codes:
+            result.update({
+                "envelope_id": unique_envelope_ids[0],
+                "access_code": filtered_access_codes[0],
+                "message": f"Found envelope ID: {unique_envelope_ids[0]} and access code: {filtered_access_codes[0]}",
+                "ready_for_workflow": True
+            })
+        elif unique_envelope_ids:
+            result.update({
+                "envelope_id": unique_envelope_ids[0],
+                "message": f"Found envelope ID: {unique_envelope_ids[0]} but no access code",
+                "ready_for_workflow": False
+            })
+        elif filtered_access_codes:
+            result.update({
+                "access_code": filtered_access_codes[0],
+                "message": f"Found access code: {filtered_access_codes[0]} but no envelope ID",
+                "ready_for_workflow": False
+            })
+        else:
+            result.update({
+                "success": False,
+                "error": "No envelope ID or access code found",
+                "message": "Could not find envelope ID or access code in email content",
+                "ready_for_workflow": False
+            })
+        
+        logger.info(f"🔍 Extraction result: {result}")
+        return result
+            
+    except Exception as e:
+        logger.error(f"❌ extract_envelope_and_access_code error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to extract envelope ID and access code"}
 
 def handle_create_recipient_view_with_code(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle creating recipient view URL using access code."""
@@ -833,6 +922,181 @@ def handle_create_recipient_view_with_code(args: Dict[str, Any]) -> Dict[str, An
         logger.error(f"❌ create_recipient_view_with_code error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to create recipient view"}
 
+def handle_access_document_with_code(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle accessing DocuSign document using access code and completing the workflow."""
+    try:
+        access_code = args.get("access_code")
+        recipient_email = args.get("recipient_email")
+        field_data = args.get("field_data", {})
+        return_url = args.get("return_url", "https://www.docusign.com")
+        
+        if not access_code:
+            return {"success": False, "error": "access_code is required", "message": "Please provide access_code"}
+        if not recipient_email:
+            return {"success": False, "error": "recipient_email is required", "message": "Please provide recipient_email"}
+        
+        logger.info(f"🔐 access_document_with_code called with access_code: {access_code}, recipient_email: {recipient_email}")
+        
+        if USE_REAL_APIS:
+            logger.info("🔗 Using REAL DocuSign API")
+            try:
+                from esign_docusign import access_document_with_code
+                result = access_document_with_code(access_code, recipient_email, field_data, return_url)
+                
+                logger.info(f"🔐 DocuSign result: {result}")
+                
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "signing_url": result.get("signing_url"),
+                        "envelope_id": result.get("envelope_id"),
+                        "recipient_email": recipient_email,
+                        "access_code": access_code,
+                        "message": "Document accessed successfully with access code",
+                        "workflow_completed": result.get("workflow_completed", False),
+                        "next_steps": result.get("next_steps", [])
+                    }
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.error(f"❌ DocuSign API error: {error_msg}")
+                    return {"success": False, "error": error_msg, "message": "Failed to access document with access code"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to access document with access code"}
+        else:
+            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+            
+    except Exception as e:
+        logger.error(f"❌ access_document_with_code error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to access document with access code"}
+
+def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle complete DocuSign workflow: extract from email, access document, fill, sign, and send."""
+    try:
+        email_content = args.get("email_content", "")
+        recipient_email = args.get("recipient_email", "")
+        field_data = args.get("field_data", {})
+        return_url = args.get("return_url", "https://www.docusign.com")
+        
+        if not email_content:
+            return {"success": False, "error": "email_content is required", "message": "Please provide email_content"}
+        
+        logger.info(f"🔄 complete_docusign_workflow called with email_content length: {len(email_content)}")
+        
+        # Step 1: Extract envelope ID and access code from email
+        logger.info("🔍 Step 1: Extracting envelope ID and access code from email...")
+        extraction_result = handle_extract_envelope_and_access_code({"email_content": email_content})
+        
+        if not extraction_result.get("success"):
+            return {
+                "success": False,
+                "error": "Extraction failed",
+                "message": "Could not extract envelope ID and access code from email",
+                "extraction_result": extraction_result
+            }
+        
+        if not extraction_result.get("ready_for_workflow"):
+            return {
+                "success": False,
+                "error": "Incomplete extraction",
+                "message": "Could not extract both envelope ID and access code from email",
+                "extraction_result": extraction_result,
+                "suggestions": [
+                    "Check if the email contains both envelope ID and access code",
+                    "Look for UUID patterns (envelope ID) and access code patterns",
+                    "Ensure the email is from DocuSign"
+                ]
+            }
+        
+        envelope_id = extraction_result.get("envelope_id")
+        access_code = extraction_result.get("access_code")
+        
+        logger.info(f"✅ Step 1 complete: envelope_id={envelope_id}, access_code={access_code}")
+        
+        # Step 2: Create recipient view with access code
+        logger.info("🔗 Step 2: Creating recipient view with access code...")
+        recipient_view_result = handle_create_recipient_view_with_code({
+            "envelope_id": envelope_id,
+            "recipient_email": recipient_email or "unknown@example.com",
+            "access_code": access_code,
+            "return_url": return_url
+        })
+        
+        if not recipient_view_result.get("success"):
+            return {
+                "success": False,
+                "error": "Recipient view creation failed",
+                "message": "Could not create recipient view with access code",
+                "extraction_result": extraction_result,
+                "recipient_view_result": recipient_view_result
+            }
+        
+        signing_url = recipient_view_result.get("signing_url")
+        logger.info(f"✅ Step 2 complete: signing_url created")
+        
+        # Step 3: Fill document fields if provided
+        if field_data:
+            logger.info("📝 Step 3: Filling document fields...")
+            fill_result = handle_fill_document_fields({
+                "envelope_id": envelope_id,
+                "field_data": field_data
+            })
+            
+            if not fill_result.get("success"):
+                logger.warning(f"⚠️ Step 3 failed: {fill_result.get('error')}")
+            else:
+                logger.info("✅ Step 3 complete: document fields filled")
+        else:
+            logger.info("⏭️ Step 3 skipped: no field data provided")
+            fill_result = {"success": True, "message": "No fields to fill"}
+        
+        # Step 4: Complete signing
+        logger.info("✍️ Step 4: Completing signing process...")
+        sign_result = handle_sign_envelope({
+            "envelope_id": envelope_id,
+            "recipient_email": recipient_email or "unknown@example.com",
+            "security_code": access_code
+        })
+        
+        if not sign_result.get("success"):
+            logger.warning(f"⚠️ Step 4 failed: {sign_result.get('error')}")
+        else:
+            logger.info("✅ Step 4 complete: signing process completed")
+        
+        # Return comprehensive result
+        return {
+            "success": True,
+            "message": "DocuSign workflow completed successfully",
+            "workflow_steps": {
+                "step_1_extraction": extraction_result,
+                "step_2_recipient_view": recipient_view_result,
+                "step_3_fill_fields": fill_result,
+                "step_4_signing": sign_result
+            },
+            "final_results": {
+                "envelope_id": envelope_id,
+                "access_code": access_code,
+                "signing_url": signing_url,
+                "recipient_email": recipient_email or "unknown@example.com",
+                "fields_filled": bool(field_data),
+                "signing_completed": sign_result.get("success", False)
+            },
+            "next_steps": [
+                "Use the signing_url to access the document",
+                "Complete any remaining signing steps in the DocuSign interface",
+                "Check envelope status for completion"
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ complete_docusign_workflow error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {"success": False, "error": str(e), "message": "Failed to complete DocuSign workflow"}
+
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
     "getenvelope": handle_getenvelope,
@@ -848,7 +1112,10 @@ TOOL_HANDLERS.update({
     "fill_document_fields": handle_fill_document_fields,
     "create_demo_envelope": handle_create_demo_envelope,
     "extract_access_code": handle_extract_access_code,
-    "create_recipient_view_with_code": handle_create_recipient_view_with_code
+    "extract_envelope_and_access_code": handle_extract_envelope_and_access_code,
+    "create_recipient_view_with_code": handle_create_recipient_view_with_code,
+    "access_document_with_code": handle_access_document_with_code,
+    "complete_docusign_workflow": handle_complete_docusign_workflow
 })
 
 def create_test_pdf():
@@ -1056,6 +1323,17 @@ async def mcp_endpoint(request: Request):
                             }
                         },
                         {
+                            "name": "extract_envelope_and_access_code",
+                            "description": "Extract both envelope ID and access code from DocuSign email content",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "email_content": {"type": "string", "description": "Full email content to search for envelope ID and access code"}
+                                },
+                                "required": ["email_content"]
+                            }
+                        },
+                        {
                             "name": "create_recipient_view_with_code",
                             "description": "Create recipient view URL using access code for document access",
                             "inputSchema": {
@@ -1067,6 +1345,34 @@ async def mcp_endpoint(request: Request):
                                     "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
                                 },
                                 "required": ["envelope_id", "recipient_email", "access_code"]
+                            }
+                        },
+                        {
+                            "name": "access_document_with_code",
+                            "description": "Access DocuSign document using access code and complete the workflow (fill, sign, send)",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "access_code": {"type": "string", "description": "Access code extracted from email"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["access_code", "recipient_email"]
+                            }
+                        },
+                        {
+                            "name": "complete_docusign_workflow",
+                            "description": "Complete DocuSign workflow: extract envelope ID and access code from email, then fill, sign, and send document",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "email_content": {"type": "string", "description": "Full DocuSign email content containing envelope ID and access code"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address (optional, will be extracted if not provided)"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["email_content"]
                             }
                         }
                     ]
@@ -1269,6 +1575,17 @@ async def sse_endpoint(request: Request):
                             }
                         },
                         {
+                            "name": "extract_envelope_and_access_code",
+                            "description": "Extract both envelope ID and access code from DocuSign email content",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "email_content": {"type": "string", "description": "Full email content to search for envelope ID and access code"}
+                                },
+                                "required": ["email_content"]
+                            }
+                        },
+                        {
                             "name": "create_recipient_view_with_code",
                             "description": "Create recipient view URL using access code for document access",
                             "inputSchema": {
@@ -1280,6 +1597,34 @@ async def sse_endpoint(request: Request):
                                     "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
                                 },
                                 "required": ["envelope_id", "recipient_email", "access_code"]
+                            }
+                        },
+                        {
+                            "name": "access_document_with_code",
+                            "description": "Access DocuSign document using access code and complete the workflow (fill, sign, send)",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "access_code": {"type": "string", "description": "Access code extracted from email"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["access_code", "recipient_email"]
+                            }
+                        },
+                        {
+                            "name": "complete_docusign_workflow",
+                            "description": "Complete DocuSign workflow: extract envelope ID and access code from email, then fill, sign, and send document",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "email_content": {"type": "string", "description": "Full DocuSign email content containing envelope ID and access code"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address (optional, will be extracted if not provided)"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["email_content"]
                             }
                         }
                     ]

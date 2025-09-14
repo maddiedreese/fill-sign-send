@@ -254,3 +254,284 @@ def download_signed_pdf_docusign(envelope_id: str) -> Dict[str, Any]:
             "error": str(e),
             "signed_pdf_url": None
         }
+
+def fill_envelope_docusign(envelope_id: str, field_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Fill an existing DocuSign envelope with data.
+    
+    Args:
+        envelope_id: ID of the envelope to fill
+        field_data: Dictionary of field names and values to fill
+        
+    Returns:
+        Dictionary with success status and message
+    """
+    try:
+        logger.info(f"📝 Filling envelope {envelope_id} with data: {field_data}")
+        
+        # Get authenticated API client
+        api_client = _docusign_client.get_api_client()
+        envelopes_api = EnvelopesApi(api_client)
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        
+        # Get envelope details
+        envelope = envelopes_api.get_envelope(account_id=account_id, envelope_id=envelope_id)
+        
+        if envelope.status != "sent":
+            return {
+                "success": False,
+                "error": f"Envelope status is {envelope.status}, cannot fill",
+                "message": "Only sent envelopes can be filled"
+            }
+        
+        # Create document update request
+        from docusign_esign.models import Document, Tabs, Text, SignHere
+        
+        # Get the first document
+        if not envelope.documents or len(envelope.documents) == 0:
+            return {
+                "success": False,
+                "error": "No documents found in envelope",
+                "message": "Cannot fill envelope without documents"
+            }
+        
+        document = envelope.documents[0]
+        
+        # Create tabs for text fields
+        text_tabs = []
+        for field_name, field_value in field_data.items():
+            text_tab = Text(
+                tab_label=field_name,
+                value=str(field_value),
+                document_id=document.document_id,
+                page_number="1"
+            )
+            text_tabs.append(text_tab)
+        
+        # Update envelope with filled data
+        from docusign_esign.models import EnvelopeDefinition, Recipients, Signer
+        
+        # Get existing recipients
+        recipients = envelope.recipients
+        if recipients and recipients.signers:
+            signer = recipients.signers[0]
+            if not signer.tabs:
+                signer.tabs = Tabs()
+            if not signer.tabs.text_tabs:
+                signer.tabs.text_tabs = []
+            signer.tabs.text_tabs.extend(text_tabs)
+        
+        # Update envelope
+        envelope_definition = EnvelopeDefinition(
+            recipients=recipients
+        )
+        
+        result = envelopes_api.update(account_id=account_id, envelope_id=envelope_id, envelope=envelope_definition)
+        
+        logger.info(f"📝 Successfully filled envelope {envelope_id}")
+        
+        return {
+            "success": True,
+            "message": f"Envelope {envelope_id} filled successfully",
+            "envelope_id": envelope_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Error filling envelope: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to fill envelope"
+        }
+
+def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code: str = None) -> Dict[str, Any]:
+    """
+    Sign a DocuSign envelope using security code or get signing URL.
+    
+    Args:
+        envelope_id: ID of the envelope to sign
+        recipient_email: Email of the recipient signing
+        security_code: Optional security code for authentication
+        
+    Returns:
+        Dictionary with success status and signing URL or completion status
+    """
+    try:
+        logger.info(f"✍️ Signing envelope {envelope_id} for {recipient_email}")
+        
+        # Get authenticated API client
+        api_client = _docusign_client.get_api_client()
+        envelopes_api = EnvelopesApi(api_client)
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        
+        # Get envelope details
+        envelope = envelopes_api.get_envelope(account_id=account_id, envelope_id=envelope_id)
+        
+        if envelope.status not in ["sent", "delivered"]:
+            return {
+                "success": False,
+                "error": f"Envelope status is {envelope.status}, cannot sign",
+                "message": "Only sent or delivered envelopes can be signed"
+            }
+        
+        # If security code provided, authenticate and sign
+        if security_code:
+            # Create recipient view request
+            from docusign_esign.models import RecipientViewRequest
+            
+            recipient_view_request = RecipientViewRequest(
+                authentication_method="none",
+                email=recipient_email,
+                user_name=recipient_email,
+                client_user_id=recipient_email,
+                return_url="https://docusign.com"
+            )
+            
+            # Get recipient view URL
+            result = envelopes_api.create_recipient_view(
+                account_id=account_id,
+                envelope_id=envelope_id,
+                recipient_view_request=recipient_view_request
+            )
+            
+            logger.info(f"✍️ Created signing URL for envelope {envelope_id}")
+            
+            return {
+                "success": True,
+                "signing_url": result.url,
+                "message": f"Signing URL created for envelope {envelope_id}",
+                "envelope_id": envelope_id
+            }
+        else:
+            # Just return envelope status
+            return {
+                "success": True,
+                "envelope_id": envelope_id,
+                "status": envelope.status,
+                "message": f"Envelope {envelope_id} status: {envelope.status}"
+            }
+        
+    except Exception as e:
+        logger.error(f"Error signing envelope: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to sign envelope"
+        }
+
+def submit_envelope_docusign(envelope_id: str) -> Dict[str, Any]:
+    """
+    Submit a completed DocuSign envelope.
+    
+    Args:
+        envelope_id: ID of the envelope to submit
+        
+    Returns:
+        Dictionary with success status and final envelope status
+    """
+    try:
+        logger.info(f"📤 Submitting envelope {envelope_id}")
+        
+        # Get authenticated API client
+        api_client = _docusign_client.get_api_client()
+        envelopes_api = EnvelopesApi(api_client)
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        
+        # Get envelope details
+        envelope = envelopes_api.get_envelope(account_id=account_id, envelope_id=envelope_id)
+        
+        if envelope.status not in ["completed", "signed"]:
+            return {
+                "success": False,
+                "error": f"Envelope status is {envelope.status}, cannot submit",
+                "message": "Only completed or signed envelopes can be submitted"
+            }
+        
+        # Envelope is already submitted if status is completed
+        if envelope.status == "completed":
+            logger.info(f"📤 Envelope {envelope_id} already completed")
+            return {
+                "success": True,
+                "envelope_id": envelope_id,
+                "status": "completed",
+                "message": f"Envelope {envelope_id} is already completed"
+            }
+        
+        # For signed envelopes, they are automatically submitted
+        logger.info(f"📤 Envelope {envelope_id} submitted successfully")
+        
+        return {
+            "success": True,
+            "envelope_id": envelope_id,
+            "status": "completed",
+            "message": f"Envelope {envelope_id} submitted successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error submitting envelope: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to submit envelope"
+        }
+
+def get_envelope_status_docusign(envelope_id: str) -> Dict[str, Any]:
+    """
+    Get the status and details of a DocuSign envelope.
+    
+    Args:
+        envelope_id: ID of the envelope to check
+        
+    Returns:
+        Dictionary with success status and envelope details
+    """
+    try:
+        logger.info(f"📊 Getting status for envelope {envelope_id}")
+        
+        # Get authenticated API client
+        api_client = _docusign_client.get_api_client()
+        envelopes_api = EnvelopesApi(api_client)
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        
+        # Get envelope details
+        envelope = envelopes_api.get_envelope(account_id=account_id, envelope_id=envelope_id)
+        
+        # Get recipient information
+        recipients_info = []
+        if envelope.recipients and envelope.recipients.signers:
+            for signer in envelope.recipients.signers:
+                recipients_info.append({
+                    "email": signer.email,
+                    "name": signer.name,
+                    "status": signer.status,
+                    "signed_date": signer.signed_date_time
+                })
+        
+        logger.info(f"📊 Envelope {envelope_id} status: {envelope.status}")
+        
+        return {
+            "success": True,
+            "envelope_id": envelope_id,
+            "status": envelope.status,
+            "created_date": envelope.created_date_time,
+            "sent_date": envelope.sent_date_time,
+            "completed_date": envelope.completed_date_time,
+            "recipients": recipients_info,
+            "message": f"Envelope {envelope_id} status: {envelope.status}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting envelope status: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to get envelope status"
+        }

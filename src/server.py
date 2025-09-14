@@ -168,6 +168,10 @@ def handle_get_server_info(args):
 
 # Tool dispatcher
 TOOL_HANDLERS = {
+    "fill_envelope": handle_fill_envelope,
+    "sign_envelope": handle_sign_envelope,
+    "submit_envelope": handle_submit_envelope,
+    "get_envelope_status": handle_get_envelope_status,
     "send_for_signature": handle_send_for_signature,
     "get_server_info": handle_get_server_info
 }
@@ -248,3 +252,174 @@ if __name__ == "__main__":
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
     
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+def handle_fill_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle filling a DocuSign envelope with data."""
+    try:
+        envelope_id = args.get("envelope_id")
+        field_data = args.get("field_data", {})
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
+        
+        if not field_data:
+            return {"success": False, "error": "field_data is required", "message": "Please provide field_data to fill"}
+        
+        logger.info(f"📝 fill_envelope called with envelope_id: {envelope_id}, field_data: {field_data}")
+        
+        if USE_REAL_APIS:
+            logger.info("🔗 Using REAL DocuSign API")
+            try:
+                from esign_docusign import fill_envelope_docusign
+                result = fill_envelope_docusign(envelope_id, field_data)
+                
+                logger.info(f"📝 DocuSign result: {result}")
+                
+                if result.get("success"):
+                    return {"success": True, "envelope_id": result["envelope_id"], "message": result["message"]}
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.error(f"❌ DocuSign API error: {error_msg}")
+                    return {"success": False, "error": error_msg, "message": "Failed to fill envelope"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to fill envelope"}
+        else:
+            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+            
+    except Exception as e:
+        logger.error(f"❌ fill_envelope error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to fill envelope"}
+
+def handle_sign_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle signing a DocuSign envelope."""
+    try:
+        envelope_id = args.get("envelope_id")
+        recipient_email = args.get("recipient_email")
+        security_code = args.get("security_code")
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
+        
+        if not recipient_email:
+            return {"success": False, "error": "recipient_email is required", "message": "Please provide recipient_email"}
+        
+        logger.info(f"✍️ sign_envelope called with envelope_id: {envelope_id}, recipient_email: {recipient_email}")
+        
+        if USE_REAL_APIS:
+            logger.info("🔗 Using REAL DocuSign API")
+            try:
+                from esign_docusign import sign_envelope_docusign
+                result = sign_envelope_docusign(envelope_id, recipient_email, security_code)
+                
+                logger.info(f"✍️ DocuSign result: {result}")
+                
+                if result.get("success"):
+                    response = {"success": True, "envelope_id": result["envelope_id"], "message": result["message"]}
+                    if "signing_url" in result:
+                        response["signing_url"] = result["signing_url"]
+                    if "status" in result:
+                        response["status"] = result["status"]
+                    return response
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.error(f"❌ DocuSign API error: {error_msg}")
+                    return {"success": False, "error": error_msg, "message": "Failed to sign envelope"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to sign envelope"}
+        else:
+            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+            
+    except Exception as e:
+        logger.error(f"❌ sign_envelope error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to sign envelope"}
+
+def handle_submit_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle submitting a DocuSign envelope."""
+    try:
+        envelope_id = args.get("envelope_id")
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
+        
+        logger.info(f"📤 submit_envelope called with envelope_id: {envelope_id}")
+        
+        if USE_REAL_APIS:
+            logger.info("🔗 Using REAL DocuSign API")
+            try:
+                from esign_docusign import submit_envelope_docusign
+                result = submit_envelope_docusign(envelope_id)
+                
+                logger.info(f"📤 DocuSign result: {result}")
+                
+                if result.get("success"):
+                    return {"success": True, "envelope_id": result["envelope_id"], "status": result["status"], "message": result["message"]}
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.error(f"❌ DocuSign API error: {error_msg}")
+                    return {"success": False, "error": error_msg, "message": "Failed to submit envelope"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to submit envelope"}
+        else:
+            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+            
+    except Exception as e:
+        logger.error(f"❌ submit_envelope error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to submit envelope"}
+
+def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle getting DocuSign envelope status."""
+    try:
+        envelope_id = args.get("envelope_id")
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
+        
+        logger.info(f"📊 get_envelope_status called with envelope_id: {envelope_id}")
+        
+        if USE_REAL_APIS:
+            logger.info("🔗 Using REAL DocuSign API")
+            try:
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
+                
+                logger.info(f"📊 DocuSign result: {result}")
+                
+                if result.get("success"):
+                    return {
+                        "success": True, 
+                        "envelope_id": result["envelope_id"], 
+                        "status": result["status"],
+                        "created_date": result.get("created_date"),
+                        "sent_date": result.get("sent_date"),
+                        "completed_date": result.get("completed_date"),
+                        "recipients": result.get("recipients", []),
+                        "message": result["message"]
+                    }
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.error(f"❌ DocuSign API error: {error_msg}")
+                    return {"success": False, "error": error_msg, "message": "Failed to get envelope status"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to get envelope status"}
+        else:
+            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+            
+    except Exception as e:
+        logger.error(f"❌ get_envelope_status error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to get envelope status"}

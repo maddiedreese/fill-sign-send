@@ -19,7 +19,7 @@ import uvicorn
 # Import real implementations with proper error handling
 try:
     from settings import settings
-    from pdf_utils import detect_pdf_fields, fill_pdf_fields
+    from pdf_utils import extract_acroform_fields, fill_and_flatten
     from esign_docusign import send_for_signature_docusign, check_signature_status_docusign, download_signed_pdf_docusign
     print("✅ Successfully imported all modules")
 except ImportError as e:

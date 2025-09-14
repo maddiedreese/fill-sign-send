@@ -36,8 +36,8 @@ class DocuSignClient:
             
             # Create API client
             self.api_client = ApiClient()
-            # FIXED: Use correct DocuSign demo REST API endpoint
-            self.api_client.host = "https://demo.docusign.net/restapi"
+            # Use production URL if in production environment
+            self.api_client.host = settings.get_docusign_base_url()
             
             # Prepare JWT token - Use string format directly
             private_key = load_private_key_from_env()

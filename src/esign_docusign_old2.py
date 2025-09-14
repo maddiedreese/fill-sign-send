@@ -4,7 +4,6 @@ DocuSign e-signature integration with proper JWT authentication
 import time
 import jwt
 import requests
-import base64
 from typing import Dict, Any, Optional
 from docusign_esign import ApiClient, AuthenticationApi, EnvelopesApi
 from docusign_esign.models import EnvelopeDefinition, Document, Signer, SignHere, Tabs, Recipients
@@ -36,27 +35,28 @@ class DocuSignClient:
             
             # Create API client
             self.api_client = ApiClient()
-            # FIXED: Use correct DocuSign demo REST API endpoint
-            self.api_client.host = "https://demo.docusign.net/restapi"
+            # Use production URL if in production environment
+            self.api_client.host = settings.get_docusign_base_url()
             
-            # Prepare JWT token - Use string format directly
-            private_key = load_private_key_from_env()
+            # Prepare JWT token
+            private_key = self._parse_private_key(load_private_key_from_env())
             
-            # JWT payload
+            # JWT payload - FIXED for proper DocuSign authentication
             now = int(time.time())
             payload = {
                 "iss": config["integration_key"],  # Client ID
                 "sub": config["user_id"],          # User ID to impersonate
-                "aud": "account-d.docusign.com",  # Use correct audience for production
+                "aud": "account-d.docusign.com",  # FIXED: Use correct audience for production
                 "iat": now,
                 "exp": now + 3600,  # 1 hour expiration
                 "scope": "signature impersonation"
             }
             
-            # Sign JWT - Use string format
+            # Sign JWT
             token = jwt.encode(payload, private_key, algorithm="RS256")
             
             # Exchange JWT for access token using direct HTTP request
+            # FIXED: Use correct auth URL for production
             auth_url = "https://account-d.docusign.com/oauth/token"
             
             auth_data = {
@@ -81,6 +81,25 @@ class DocuSignClient:
         except Exception as e:
             logger.error(f"DocuSign authentication failed: {e}")
             raise ValueError(f"Failed to authenticate with DocuSign: {e}")
+    
+    def _parse_private_key(self, private_key_str: str) -> bytes:
+        """
+        Parse private key string to bytes.
+        
+        Args:
+            private_key_str: Private key as string
+            
+        Returns:
+            Private key as bytes
+        """
+        # Remove any extra whitespace and newlines
+        private_key_str = private_key_str.strip()
+        
+        # Add proper PEM headers if missing
+        if not private_key_str.startswith("-----BEGIN"):
+            private_key_str = "-----BEGIN PRIVATE KEY-----\n" + private_key_str + "\n-----END PRIVATE KEY-----"
+        
+        return private_key_str.encode('utf-8')
 
 # Global client instance
 _docusign_client = DocuSignClient()
@@ -112,12 +131,12 @@ def send_for_signature_docusign(file_url: str, recipient_email: str, recipient_n
             status="sent"
         )
         
-        # Add document - FIXED: Use base64.b64encode instead of .encode('base64')
+        # Add document
         with open(file_url, 'rb') as file:
             file_content = file.read()
         
         document = Document(
-            document_base64=base64.b64encode(file_content).decode('utf-8'),  # FIXED
+            document_base64=file_content.encode('base64'),
             name=file_url.split('/')[-1],
             file_extension="pdf",
             document_id="1"

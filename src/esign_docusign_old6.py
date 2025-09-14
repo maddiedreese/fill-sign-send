@@ -1,10 +1,9 @@
 """
-DocuSign e-signature integration with proper JWT authentication
+DocuSign e-signature integration with simple JWT authentication
 """
 import time
 import jwt
 import requests
-import base64
 from typing import Dict, Any, Optional
 from docusign_esign import ApiClient, AuthenticationApi, EnvelopesApi
 from docusign_esign.models import EnvelopeDefinition, Document, Signer, SignHere, Tabs, Recipients
@@ -36,8 +35,8 @@ class DocuSignClient:
             
             # Create API client
             self.api_client = ApiClient()
-            # FIXED: Use correct DocuSign demo REST API endpoint
-            self.api_client.host = "https://demo.docusign.net/restapi"
+            # Use production URL if in production environment
+            self.api_client.host = settings.get_docusign_base_url()
             
             # Prepare JWT token - Use string format directly
             private_key = load_private_key_from_env()
@@ -112,12 +111,12 @@ def send_for_signature_docusign(file_url: str, recipient_email: str, recipient_n
             status="sent"
         )
         
-        # Add document - FIXED: Use base64.b64encode instead of .encode('base64')
+        # Add document
         with open(file_url, 'rb') as file:
             file_content = file.read()
         
         document = Document(
-            document_base64=base64.b64encode(file_content).decode('utf-8'),  # FIXED
+            document_base64=file_content.encode('base64'),
             name=file_url.split('/')[-1],
             file_extension="pdf",
             document_id="1"

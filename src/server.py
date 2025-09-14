@@ -636,6 +636,92 @@ def handle_fill_document_fields(args: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
         return {"success": False, "error": str(e), "message": "Failed to fill document fields"}
 
+def handle_create_demo_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle creating a demo envelope for testing."""
+    try:
+        pdf_url = args.get("pdf_url")
+        signer_email = args.get("signer_email", "test@example.com")
+        signer_name = args.get("signer_name", "Test Signer")
+        subject = args.get("subject", "Demo Document for Testing")
+        message = args.get("message", "This is a test document created in demo environment")
+        
+        if not pdf_url:
+            return {"success": False, "error": "pdf_url is required", "message": "Please provide pdf_url"}
+        
+        logger.info(f"📄 Creating demo envelope for testing")
+        logger.info(f"📄 PDF URL: {pdf_url}")
+        logger.info(f"📧 Signer: {signer_name} <{signer_email}>")
+        
+        if USE_REAL_APIS:
+            try:
+                # Download the PDF first
+                filename = download_file_from_url(pdf_url)
+                if not filename:
+                    return {"success": False, "error": "Failed to download PDF", "message": "Could not download PDF from URL"}
+                
+                # Create envelope using existing function
+                from esign_docusign import send_for_signature_docusign
+                result = send_for_signature_docusign(
+                    filename, 
+                    signer_email, 
+                    signer_name, 
+                    subject,
+                    message
+                )
+                
+                # Clean up the temporary file
+                try:
+                    os.remove(filename)
+                except:
+                    pass
+                
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "envelope_id": result.get("envelope_id"),
+                        "signer_email": signer_email,
+                        "signer_name": signer_name,
+                        "subject": subject,
+                        "message": "Demo envelope created successfully",
+                        "next_steps": [
+                            "1. Use 'get_envelope_status' to check the envelope status",
+                            "2. Use 'fill_document_fields' to fill any form fields",
+                            "3. Use 'open_document_for_signing' to open for signing",
+                            "4. Check your email for the signing link"
+                        ],
+                        "note": "This envelope was created in the demo environment and can be used for testing"
+                    }
+                else:
+                    return {"success": False, "error": result.get("error"), "message": "Failed to create demo envelope"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"❌ Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to create demo envelope"}
+        else:
+            logger.warning("⚠️  Using MOCK DocuSign API")
+            return {
+                "success": True,
+                "envelope_id": "demo-envelope-12345",
+                "signer_email": signer_email,
+                "signer_name": signer_name,
+                "subject": subject,
+                "message": "Demo envelope created successfully (MOCK)",
+                "next_steps": [
+                    "1. Use 'get_envelope_status' to check the envelope status",
+                    "2. Use 'fill_document_fields' to fill any form fields", 
+                    "3. Use 'open_document_for_signing' to open for signing"
+                ],
+                "note": "This is a mock envelope for testing purposes"
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ create_demo_envelope error: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return {"success": False, "error": str(e), "message": "Failed to create demo envelope"}
+
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
     "getenvelope": handle_getenvelope,
@@ -648,7 +734,8 @@ TOOL_HANDLERS.update({
     "debug_docusign_config": handle_debug_docusign_config,
     "create_embedded_signing": handle_create_embedded_signing,
     "open_document_for_signing": handle_open_document_for_signing,
-    "fill_document_fields": handle_fill_document_fields
+    "fill_document_fields": handle_fill_document_fields,
+    "create_demo_envelope": handle_create_demo_envelope
 })
 
 def create_test_pdf():
@@ -828,6 +915,21 @@ async def mcp_endpoint(request: Request):
                                 },
                                 "required": ["envelope_id", "field_data"]
                             }
+                        },
+                        {
+                            "name": "create_demo_envelope",
+                            "description": "Create a demo envelope for testing in demo environment",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
+                                    "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
+                                    "subject": {"type": "string", "description": "Email subject (optional)"},
+                                    "message": {"type": "string", "description": "Email message (optional)"}
+                                },
+                                "required": ["pdf_url"]
+                            }
                         }
                     ]
                 }
@@ -1000,6 +1102,21 @@ async def sse_endpoint(request: Request):
                                     "field_data": {"type": "object", "description": "Form field data to fill"}
                                 },
                                 "required": ["envelope_id", "field_data"]
+                            }
+                        },
+                        {
+                            "name": "create_demo_envelope",
+                            "description": "Create a demo envelope for testing in demo environment",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
+                                    "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
+                                    "subject": {"type": "string", "description": "Email subject (optional)"},
+                                    "message": {"type": "string", "description": "Email message (optional)"}
+                                },
+                                "required": ["pdf_url"]
                             }
                         }
                     ]

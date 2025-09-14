@@ -339,6 +339,8 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
             return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
         
         logger.info(f"📊 get_envelope_status called with envelope_id: {envelope_id}")
+        logger.info(f"🌍 DocuSign environment: {settings.DOCUSIGN_BASE_PATH}")
+        logger.info(f"🏢 DocuSign account ID: {settings.DOCUSIGN_ACCOUNT_ID}")
         
         if USE_REAL_APIS:
             logger.info("🔗 Using REAL DocuSign API")
@@ -357,11 +359,20 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
                         "sent_date": result.get("sent_date"),
                         "completed_date": result.get("completed_date"),
                         "recipients": result.get("recipients", []),
+                        "docusign_environment": settings.DOCUSIGN_BASE_PATH,
+                        "account_id": settings.DOCUSIGN_ACCOUNT_ID
                     }
                 else:
                     error_msg = result.get("error", "Unknown error")
                     logger.error(f"❌ DocuSign API error: {error_msg}")
-                    return {"success": False, "error": error_msg, "message": "Failed to get envelope status"}
+                    return {
+                        "success": False, 
+                        "error": error_msg, 
+                        "message": "Failed to get envelope status",
+                        "docusign_environment": settings.DOCUSIGN_BASE_PATH,
+                        "account_id": settings.DOCUSIGN_ACCOUNT_ID,
+                        "troubleshooting": "If you're getting 404 errors, the envelope might be in a different DocuSign environment (demo vs production) or account"
+                    }
                     
             except Exception as e:
                 logger.error(f"❌ DocuSign API exception: {e}")
@@ -375,121 +386,255 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"❌ get_envelope_status error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to get envelope status"}
 
-def handle_extract_envelope_id_from_document(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle extracting envelope ID from document content."""
+def handle_debug_docusign_config(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle debugging DocuSign configuration and environment."""
     try:
-        document_url = args.get("document_url")
-        document_text = args.get("document_text")
+        logger.info(f"🔍 Debugging DocuSign configuration")
         
-        if not document_url and not document_text:
-            return {"success": False, "error": "document_url or document_text is required", "message": "Please provide either a document URL or the document text content"}
+        config_info = {
+            "docusign_base_path": settings.DOCUSIGN_BASE_PATH,
+            "docusign_account_id": settings.DOCUSIGN_ACCOUNT_ID,
+            "docusign_integration_key": settings.DOCUSIGN_INTEGRATION_KEY[:8] + "..." if settings.DOCUSIGN_INTEGRATION_KEY else None,
+            "docusign_user_id": settings.DOCUSIGN_USER_ID,
+            "environment": settings.ENVIRONMENT,
+            "is_production": settings.is_production(),
+            "docusign_configured": settings.validate_docusign_config()
+        }
         
-        logger.info(f"📋 Extracting envelope ID from document")
-        
-        # If we have a URL, download the document first
-        if document_url:
-            logger.info(f"📥 Downloading document from URL: {document_url}")
-            filename = download_file_from_url(document_url)
-            if not filename:
-                return {"success": False, "error": "Failed to download document", "message": "Could not download document from URL"}
-            
-            # Read the document content
+        # Test API connectivity
+        if USE_REAL_APIS and settings.validate_docusign_config():
             try:
-                with open(filename, 'r', encoding='utf-8') as f:
-                    document_text = f.read()
-                # Clean up the temporary file
-                os.remove(filename)
+                from esign_docusign import get_envelope_status_docusign
+                # Try to get account info or test API
+                test_result = {"api_test": "DocuSign API is configured and ready"}
             except Exception as e:
-                logger.error(f"❌ Failed to read document: {e}")
-                return {"success": False, "error": str(e), "message": "Failed to read document content"}
+                test_result = {"api_test": f"DocuSign API error: {str(e)}"}
+        else:
+            test_result = {"api_test": "DocuSign API not configured or using mock"}
         
-        if not document_text:
-            return {"success": False, "error": "No document content available", "message": "Could not extract document content"}
+        return {
+            "success": True,
+            "configuration": config_info,
+            "api_test": test_result,
+            "troubleshooting_tips": [
+                "If getting 404 errors, check if envelope was created in demo vs production environment",
+                "Demo environment: https://demo.docusign.net",
+                "Production environment: https://www.docusign.net",
+                "Make sure the envelope was created in the same account as configured",
+                "Check if the envelope has expired or been deleted"
+            ],
+            "message": "DocuSign configuration debug information"
+        }
         
-        # Extract envelope ID from document text using various patterns
-        import re
+    except Exception as e:
+        logger.error(f"❌ debug_docusign_config error: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return {"success": False, "error": str(e), "message": "Failed to debug DocuSign configuration"}
+
+def handle_create_embedded_signing(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle creating embedded signing URL for testing without email delivery."""
+    try:
+        pdf_url = args.get("pdf_url")
+        signer_email = args.get("signer_email", "test@example.com")  # Default test email
+        signer_name = args.get("signer_name", "Test Signer")
+        return_url = args.get("return_url", "https://fill-sign-send.onrender.com/debug")
         
-        # Common patterns for envelope ID in DocuSign documents
-        patterns = [
-            r'envelope[_\s]*id[:\s]*([a-f0-9-]{36})',  # "envelope id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            r'envelope[_\s]*ID[:\s]*([a-f0-9-]{36})',  # "envelope ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            r'envelope[_\s]*number[:\s]*([a-f0-9-]{36})',  # "envelope number: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})',  # Standard UUID pattern
-            r'docusign[_\s]*envelope[:\s]*([a-f0-9-]{36})',  # "docusign envelope: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-        ]
+        if not pdf_url:
+            return {"success": False, "error": "pdf_url is required", "message": "Please provide pdf_url"}
         
-        envelope_id = None
-        for pattern in patterns:
-            matches = re.findall(pattern, document_text, re.IGNORECASE)
-            if matches:
-                envelope_id = matches[0]
-                logger.info(f"✅ Found envelope ID using pattern: {pattern}")
-                break
-        
-        if not envelope_id:
-            # Try to find any UUID-like pattern
-            uuid_pattern = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
-            uuid_matches = re.findall(uuid_pattern, document_text, re.IGNORECASE)
-            if uuid_matches:
-                envelope_id = uuid_matches[0]
-                logger.info(f"✅ Found potential envelope ID (UUID pattern): {envelope_id}")
-            else:
-                return {
-                    "success": False, 
-                    "error": "No envelope ID found", 
-                    "message": "Could not find envelope ID in document content. Please check the document manually.",
-                    "document_preview": document_text[:500] + "..." if len(document_text) > 500 else document_text
-                }
-        
-        logger.info(f"📄 Extracted envelope ID: {envelope_id}")
+        logger.info(f"🔗 Creating embedded signing URL for testing")
+        logger.info(f"📄 PDF URL: {pdf_url}")
+        logger.info(f"📧 Signer: {signer_name} <{signer_email}>")
         
         if USE_REAL_APIS:
             try:
-                # Verify the envelope ID is valid by checking envelope status
-                from esign_docusign import get_envelope_status_docusign
-                envelope_status = get_envelope_status_docusign(envelope_id)
+                # Download the PDF first
+                filename = download_file_from_url(pdf_url)
+                if not filename:
+                    return {"success": False, "error": "Failed to download PDF", "message": "Could not download PDF from URL"}
                 
-                if not envelope_status.get("success"):
+                # Create envelope with embedded signing
+                from esign_docusign import send_for_signature_docusign
+                result = send_for_signature_docusign(
+                    filename, 
+                    signer_email, 
+                    signer_name, 
+                    "Test Document for Signing",
+                    "Please sign this test document",
+                    return_url=return_url,
+                    embedded_signing=True
+                )
+                
+                # Clean up the temporary file
+                try:
+                    os.remove(filename)
+                except:
+                    pass
+                
+                if result.get("success"):
                     return {
-                        "success": False, 
-                        "error": envelope_status.get("error"), 
-                        "message": "Invalid envelope ID or failed to verify",
-                        "extracted_id": envelope_id
+                        "success": True,
+                        "envelope_id": result.get("envelope_id"),
+                        "embedded_signing_url": result.get("embedded_signing_url"),
+                        "signer_email": signer_email,
+                        "signer_name": signer_name,
+                        "message": "Embedded signing URL created successfully for testing",
+                        "instructions": [
+                            "1. Click the embedded_signing_url to open the signing interface",
+                            "2. Complete the signing process in the browser",
+                            "3. You'll be redirected to the return_url when done",
+                            "4. Use the envelope_id with other tools to check status"
+                        ],
+                        "note": "This works in demo environment without Go Live permissions"
                     }
-                
-                return {
-                    "success": True,
-                    "envelope_id": envelope_id,
-                    "envelope_status": envelope_status.get("envelope_status"),
-                    "message": "Successfully extracted and verified envelope ID from document",
-                    "next_steps": "You can now use this envelope ID with other tools like 'get_envelope_status', 'fill_envelope', or 'submit_envelope'"
-                }
-                
+                else:
+                    return {"success": False, "error": result.get("error"), "message": "Failed to create embedded signing URL"}
+                    
             except Exception as e:
-                logger.error(f"❌ DocuSign verification error: {e}")
+                logger.error(f"❌ DocuSign API exception: {e}")
                 import traceback
                 logger.error(f"❌ Traceback: {traceback.format_exc()}")
-                return {
-                    "success": False, 
-                    "error": str(e), 
-                    "message": "Failed to verify envelope ID",
-                    "extracted_id": envelope_id
-                }
+                return {"success": False, "error": str(e), "message": "Failed to create embedded signing URL"}
+        else:
+            logger.warning("⚠️  Using MOCK DocuSign API")
+            return {
+                "success": True,
+                "envelope_id": "mock-envelope-embedded-123",
+                "embedded_signing_url": "https://demo.docusign.net/signing/mock-embedded-url",
+                "signer_email": signer_email,
+                "signer_name": signer_name,
+                "message": "Embedded signing URL created successfully (MOCK) for testing",
+                "instructions": [
+                    "1. Click the embedded_signing_url to open the signing interface",
+                    "2. Complete the signing process in the browser",
+                    "3. You'll be redirected to the return_url when done",
+                    "4. Use the envelope_id with other tools to check status"
+                ],
+                "note": "This works in demo environment without Go Live permissions"
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ create_embedded_signing error: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return {"success": False, "error": str(e), "message": "Failed to create embedded signing URL"}
+
+def handle_open_document_for_signing(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle opening existing document for signing with embedded signing URL."""
+    try:
+        envelope_id = args.get("envelope_id")
+        signer_email = args.get("signer_email", "test@example.com")
+        return_url = args.get("return_url", "https://fill-sign-send.onrender.com/debug")
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
+        
+        logger.info(f"📄 Opening document for signing")
+        logger.info(f"📋 Envelope ID: {envelope_id}")
+        logger.info(f"📧 Signer: {signer_email}")
+        
+        if USE_REAL_APIS:
+            try:
+                from esign_docusign import get_embedded_signing_url
+                result = get_embedded_signing_url(envelope_id, signer_email, return_url)
+                
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "envelope_id": envelope_id,
+                        "embedded_signing_url": result.get("embedded_signing_url"),
+                        "signer_email": signer_email,
+                        "message": "Document opened for signing successfully",
+                        "instructions": [
+                            "1. Click the embedded_signing_url to open the document",
+                            "2. Fill any required form fields",
+                            "3. Complete the signing process",
+                            "4. You'll be redirected to the return_url when done"
+                        ]
+                    }
+                else:
+                    return {"success": False, "error": result.get("error"), "message": "Failed to open document for signing"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"❌ Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to open document for signing"}
         else:
             logger.warning("⚠️  Using MOCK DocuSign API")
             return {
                 "success": True,
                 "envelope_id": envelope_id,
-                "envelope_status": "sent",
-                "message": "Successfully extracted envelope ID from document (MOCK)",
-                "next_steps": "You can now use this envelope ID with other tools like 'get_envelope_status', 'fill_envelope', or 'submit_envelope'"
+                "embedded_signing_url": f"https://demo.docusign.net/signing/mock-{envelope_id}",
+                "signer_email": signer_email,
+                "message": "Document opened for signing successfully (MOCK)",
+                "instructions": [
+                    "1. Click the embedded_signing_url to open the document",
+                    "2. Fill any required form fields",
+                    "3. Complete the signing process",
+                    "4. You'll be redirected to the return_url when done"
+                ]
             }
             
     except Exception as e:
-        logger.error(f"❌ extract_envelope_id_from_document error: {e}")
+        logger.error(f"❌ open_document_for_signing error: {e}")
         import traceback
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
-        return {"success": False, "error": str(e), "message": "Failed to extract envelope ID from document"}
+        return {"success": False, "error": str(e), "message": "Failed to open document for signing"}
+
+def handle_fill_document_fields(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle filling form fields in an existing document."""
+    try:
+        envelope_id = args.get("envelope_id")
+        field_data = args.get("field_data", {})
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
+        
+        if not field_data:
+            return {"success": False, "error": "field_data is required", "message": "Please provide field_data with form field values"}
+        
+        logger.info(f"📝 Filling document fields")
+        logger.info(f"📋 Envelope ID: {envelope_id}")
+        logger.info(f"📊 Field data: {field_data}")
+        
+        if USE_REAL_APIS:
+            try:
+                from esign_docusign import fill_document_fields
+                result = fill_document_fields(envelope_id, field_data)
+                
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "envelope_id": envelope_id,
+                        "filled_fields": result.get("filled_fields", []),
+                        "message": "Document fields filled successfully",
+                        "next_steps": "You can now open the document for signing using 'open_document_for_signing'"
+                    }
+                else:
+                    return {"success": False, "error": result.get("error"), "message": "Failed to fill document fields"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"❌ Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to fill document fields"}
+        else:
+            logger.warning("⚠️  Using MOCK DocuSign API")
+            return {
+                "success": True,
+                "envelope_id": envelope_id,
+                "filled_fields": list(field_data.keys()),
+                "message": "Document fields filled successfully (MOCK)",
+                "next_steps": "You can now open the document for signing using 'open_document_for_signing'"
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ fill_document_fields error: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return {"success": False, "error": str(e), "message": "Failed to fill document fields"}
 
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
@@ -500,7 +645,10 @@ TOOL_HANDLERS.update({
     "get_envelope_status": handle_get_envelope_status,
     "send_for_signature": handle_send_for_signature,
     "get_server_info": handle_get_server_info,
-    "extract_envelope_id_from_document": handle_extract_envelope_id_from_document
+    "debug_docusign_config": handle_debug_docusign_config,
+    "create_embedded_signing": handle_create_embedded_signing,
+    "open_document_for_signing": handle_open_document_for_signing,
+    "fill_document_fields": handle_fill_document_fields
 })
 
 def create_test_pdf():
@@ -634,15 +782,51 @@ async def mcp_endpoint(request: Request):
                             }
                         },
                         {
-                            "name": "extract_envelope_id_from_document",
-                            "description": "Extract envelope ID from document content or URL",
+                            "name": "debug_docusign_config",
+                            "description": "Debug DocuSign configuration and environment settings",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {},
+                                "required": []
+                            }
+                        },
+                        {
+                            "name": "create_embedded_signing",
+                            "description": "Create embedded signing URL for testing without email delivery",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "document_url": {"type": "string", "description": "URL to the document (optional if document_text provided)"},
-                                    "document_text": {"type": "string", "description": "Document text content (optional if document_url provided)"}
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
+                                    "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
                                 },
-                                "required": []
+                                "required": ["pdf_url"]
+                            }
+                        },
+                        {
+                            "name": "open_document_for_signing",
+                            "description": "Open existing document for signing using envelope ID",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["envelope_id"]
+                            }
+                        },
+                        {
+                            "name": "fill_document_fields",
+                            "description": "Fill form fields in existing document",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill"}
+                                },
+                                "required": ["envelope_id", "field_data"]
                             }
                         }
                     ]
@@ -771,15 +955,51 @@ async def sse_endpoint(request: Request):
                             }
                         },
                         {
-                            "name": "extract_envelope_id_from_document",
-                            "description": "Extract envelope ID from document content or URL",
+                            "name": "debug_docusign_config",
+                            "description": "Debug DocuSign configuration and environment settings",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {},
+                                "required": []
+                            }
+                        },
+                        {
+                            "name": "create_embedded_signing",
+                            "description": "Create embedded signing URL for testing without email delivery",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "document_url": {"type": "string", "description": "URL to the document (optional if document_text provided)"},
-                                    "document_text": {"type": "string", "description": "Document text content (optional if document_url provided)"}
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
+                                    "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
                                 },
-                                "required": []
+                                "required": ["pdf_url"]
+                            }
+                        },
+                        {
+                            "name": "open_document_for_signing",
+                            "description": "Open existing document for signing using envelope ID",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["envelope_id"]
+                            }
+                        },
+                        {
+                            "name": "fill_document_fields",
+                            "description": "Fill form fields in existing document",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill"}
+                                },
+                                "required": ["envelope_id", "field_data"]
                             }
                         }
                     ]

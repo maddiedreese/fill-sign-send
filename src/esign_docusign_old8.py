@@ -105,25 +105,24 @@ def send_for_signature_docusign(file_url: str, recipient_email: str, recipient_n
         # Get authenticated API client
         api_client = _docusign_client.get_api_client()
         
-        # Read and encode the document
-        with open(file_url, 'rb') as file:
-            file_content = file.read()
-        
-        # Create document with proper base64 encoding
-        document = Document(
-            document_base64=base64.b64encode(file_content).decode('utf-8'),
-            name=file_url.split('/')[-1],
-            file_extension="pdf",
-            document_id="1"
-        )
-        
         # Create envelope definition
         envelope_definition = EnvelopeDefinition(
             email_subject=subject,
             email_blurb=message,
-            status="sent",
-            documents=[document]  # FIXED: Add documents to envelope definition
+            status="sent"
         )
+        
+        # Add document - FIXED: Use base64.b64encode instead of .encode('base64')
+        with open(file_url, 'rb') as file:
+            file_content = file.read()
+        
+        document = Document(
+            document_base64=base64.b64encode(file_content).decode('utf-8'),  # FIXED
+            name=file_url.split('/')[-1],
+            file_extension="pdf",
+            document_id="1"
+        )
+        envelope_definition.documents = [document]
         
         # Add recipient
         signer = Signer(

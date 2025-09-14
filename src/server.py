@@ -423,6 +423,8 @@ def download_file_from_url(url):
 
 @app.get("/")
 async def root():
+    """Root endpoint that returns basic information about the service."""
+    return {"message": "Fill Sign Send API", "status": "running"}
 
 @app.get("/debug")
 async def debug_endpoint(request: Request):

@@ -375,6 +375,62 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"❌ get_envelope_status error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to get envelope status"}
 
+def handle_get_envelope_id_from_page(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle getting envelope ID from DocuSign document page."""
+    try:
+        signing_url = args.get("signing_url")
+        envelope_id = args.get("envelope_id")
+        
+        if not signing_url:
+            return {"success": False, "error": "signing_url is required", "message": "Please provide the DocuSign signing URL"}
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide the envelope ID from the DocuSign document page"}
+        
+        logger.info(f"📋 Processing envelope ID from DocuSign page")
+        logger.info(f"🔗 Signing URL: {signing_url}")
+        logger.info(f"📄 Envelope ID: {envelope_id}")
+        
+        if USE_REAL_APIS:
+            try:
+                # Verify the envelope ID is valid by checking envelope status
+                from esign_docusign import get_envelope_status_docusign
+                envelope_status = get_envelope_status_docusign(envelope_id)
+                
+                if not envelope_status.get("success"):
+                    return {"success": False, "error": envelope_status.get("error"), "message": "Invalid envelope ID or failed to verify"}
+                
+                return {
+                    "success": True,
+                    "envelope_id": envelope_id,
+                    "signing_url": signing_url,
+                    "envelope_status": envelope_status.get("envelope_status"),
+                    "message": "Successfully verified envelope ID from DocuSign page",
+                    "next_steps": "You can now use this envelope ID with other tools like 'get_envelope_status', 'fill_envelope', or 'submit_envelope'"
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ DocuSign verification error: {e}")
+                import traceback
+                logger.error(f"❌ Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to verify envelope ID"}
+        else:
+            logger.warning("⚠️  Using MOCK DocuSign API")
+            return {
+                "success": True,
+                "envelope_id": envelope_id,
+                "signing_url": signing_url,
+                "envelope_status": "sent",
+                "message": "Successfully processed envelope ID from DocuSign page (MOCK)",
+                "next_steps": "You can now use this envelope ID with other tools like 'get_envelope_status', 'fill_envelope', or 'submit_envelope'"
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ get_envelope_id_from_page error: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return {"success": False, "error": str(e), "message": "Failed to process envelope ID from page"}
+
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
     "getenvelope": handle_getenvelope,
@@ -383,7 +439,8 @@ TOOL_HANDLERS.update({
     "submit_envelope": handle_submit_envelope,
     "get_envelope_status": handle_get_envelope_status,
     "send_for_signature": handle_send_for_signature,
-    "get_server_info": handle_get_server_info
+    "get_server_info": handle_get_server_info,
+    "get_envelope_id_from_page": handle_get_envelope_id_from_page
 })
 
 def create_test_pdf():
@@ -515,6 +572,18 @@ async def mcp_endpoint(request: Request):
                                 },
                                 "required": ["pdf_url", "signer_email", "signer_name"]
                             }
+                        },
+                        {
+                            "name": "get_envelope_id_from_page",
+                            "description": "Get and verify envelope ID from DocuSign document page",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "signing_url": {"type": "string", "description": "DocuSign signing URL from email"},
+                                    "envelope_id": {"type": "string", "description": "Envelope ID found on the DocuSign document page"}
+                                },
+                                "required": ["signing_url", "envelope_id"]
+                            }
                         }
                     ]
                 }
@@ -639,6 +708,18 @@ async def sse_endpoint(request: Request):
                                     "signer_name": {"type": "string", "description": "Signer name"}
                                 },
                                 "required": ["pdf_url", "signer_email", "signer_name"]
+                            }
+                        },
+                        {
+                            "name": "get_envelope_id_from_page",
+                            "description": "Get and verify envelope ID from DocuSign document page",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "signing_url": {"type": "string", "description": "DocuSign signing URL from email"},
+                                    "envelope_id": {"type": "string", "description": "Envelope ID found on the DocuSign document page"}
+                                },
+                                "required": ["signing_url", "envelope_id"]
                             }
                         }
                     ]

@@ -48,6 +48,9 @@ class MockSettings:
 
     logger.warning("⚠️  Using mock implementations for missing modules")
 
+
+# Tool dispatcher - defined early to avoid forward reference issues
+TOOL_HANDLERS = {}
 app = FastAPI()
 
 def create_test_pdf():
@@ -417,11 +420,13 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e), "message": "Failed to get envelope status"}
 
 # Tool dispatcher
-TOOL_HANDLERS = {
+
+# Update TOOL_HANDLERS with all handler functions
+TOOL_HANDLERS.update({
     "fill_envelope": handle_fill_envelope,
     "sign_envelope": handle_sign_envelope,
     "submit_envelope": handle_submit_envelope,
     "get_envelope_status": handle_get_envelope_status,
     "send_for_signature": handle_send_for_signature,
     "get_server_info": handle_get_server_info
-}
+})

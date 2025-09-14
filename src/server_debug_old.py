@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """
-Doc Filling + E-Signing MCP Server - Fixed Version
-Handles file URLs properly for production
+Doc Filling + E-Signing MCP Server - Debug Version
 """
 import json
 import sys
 import os
 import time
 import logging
-import requests
 from pathlib import Path
 
 # Add the src directory to the Python path
@@ -67,43 +65,8 @@ if not USE_REAL_APIS:
 
 app = FastAPI()
 
-def create_test_pdf():
-    """Create a simple test PDF for production"""
-    try:
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import letter
-        
-        c = canvas.Canvas('test.pdf', pagesize=letter)
-        c.drawString(100, 750, 'Test Document for DocuSign')
-        c.drawString(100, 700, 'This is a test document to verify DocuSign integration.')
-        c.drawString(100, 650, 'Please sign this document to test the e-signature functionality.')
-        c.save()
-        logger.info("✅ Test PDF created successfully")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Failed to create test PDF: {e}")
-        return False
-
-def download_file_from_url(url):
-    """Download a file from URL and save it locally"""
-    try:
-        logger.info(f"📥 Downloading file from URL: {url}")
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        
-        # Save to temporary file
-        filename = f"temp_{int(time.time())}.pdf"
-        with open(filename, 'wb') as f:
-            f.write(response.content)
-        
-        logger.info(f"✅ File downloaded successfully: {filename}")
-        return filename
-    except Exception as e:
-        logger.error(f"❌ Failed to download file: {e}")
-        return None
-
 def handle_send_for_signature(args):
-    """Handle send_for_signature tool call with proper file handling."""
+    """Handle send_for_signature tool call with detailed error logging."""
     logger.info(f"📧 send_for_signature called with args: {args}")
     try:
         file_url = args.get("file_url", "")
@@ -113,29 +76,13 @@ def handle_send_for_signature(args):
         message = args.get("message", "Please review and sign this document.")
         
         logger.info(f"📧 Sending document for signature: {file_url} to {recipient_email}")
-        
-        # Handle file URL
-        actual_file_path = file_url
-        
-        # If it's a URL, download it
-        if file_url.startswith('http'):
-            actual_file_path = download_file_from_url(file_url)
-            if not actual_file_path:
-                return {"success": False, "error": "Failed to download file from URL", "message": "Could not download the document"}
-        # If it's a local file that doesn't exist, create a test PDF
-        elif not os.path.exists(file_url):
-            logger.info(f"📄 File {file_url} not found, creating test PDF")
-            if create_test_pdf():
-                actual_file_path = "test.pdf"
-            else:
-                return {"success": False, "error": "File not found and could not create test PDF", "message": "Could not access the document"}
-        
-        logger.info(f"📄 Using file: {actual_file_path}")
+        logger.info(f"📧 Subject: {subject}")
+        logger.info(f"📧 Message: {message}")
         
         if USE_REAL_APIS:
             logger.info("🔗 Using REAL DocuSign API")
             try:
-                result = send_for_signature_docusign(actual_file_path, recipient_email, recipient_name, subject, message)
+                result = send_for_signature_docusign(file_url, recipient_email, recipient_name, subject, message)
                 logger.info(f"📧 DocuSign result: {result}")
                 
                 if result.get("success"):
@@ -151,7 +98,7 @@ def handle_send_for_signature(args):
                 return {"success": False, "error": str(e), "message": "Failed to send document for signature via DocuSign"}
         else:
             logger.warning("⚠️  Using MOCK DocuSign API")
-            result = send_for_signature_docusign(actual_file_path, recipient_email, recipient_name, subject, message)
+            result = send_for_signature_docusign(file_url, recipient_email, recipient_name, subject, message)
             return {"success": True, "envelope_id": result["envelope_id"], "message": "Document sent for signature via DocuSign (MOCK)"}
     except Exception as e:
         logger.error(f"❌ send_for_signature error: {e}")

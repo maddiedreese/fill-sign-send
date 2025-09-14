@@ -102,8 +102,6 @@ def send_for_signature_docusign(file_url: str, recipient_email: str, recipient_n
         Dictionary with success status and envelope ID
     """
     try:
-        logger.info(f"📧 DocuSign function called with file: {file_url}")
-        
         # Get authenticated API client
         api_client = _docusign_client.get_api_client()
         
@@ -157,8 +155,6 @@ def send_for_signature_docusign(file_url: str, recipient_email: str, recipient_n
             envelope_definition=envelope_definition
         )
         
-        logger.info(f"📧 DocuSign envelope created: {result.envelope_id}")
-        
         return {
             "success": True,
             "envelope_id": result.envelope_id,
@@ -167,8 +163,6 @@ def send_for_signature_docusign(file_url: str, recipient_email: str, recipient_n
         
     except Exception as e:
         logger.error(f"Error sending document for signature: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
         return {
             "success": False,
             "error": str(e),

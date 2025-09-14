@@ -4,10 +4,6 @@ import sys
 import logging
 from typing import Dict, Any
 from pathlib import Path
-import json
-from fastapi import FastAPI, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 
 # Add the src directory to the Python path
 current_dir = Path(__file__).parent
@@ -16,6 +12,8 @@ sys.path.insert(0, str(current_dir))
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+from fastmcp import FastMCP
 
 # Import real implementations with proper error handling
 try:
@@ -33,17 +31,9 @@ except ImportError as e:
     logger.error(f"⚠️  Import error: {e}")
     USE_REAL_APIS = False
 
-app = FastAPI(title="DocuSign MCP Server")
+mcp = FastMCP("DocuSign MCP Server")
 
-# Add CORS middleware to allow all origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+@mcp.tool(description="Get DocuSign envelope information and status")
 def getenvelope(envelope_id: str) -> Dict[str, Any]:
     """Get DocuSign envelope information and status."""
     logger.info(f"📋 Getting envelope status for: {envelope_id}")
@@ -82,6 +72,7 @@ def getenvelope(envelope_id: str) -> Dict[str, Any]:
             "message": "DocuSign integration not available"
         }
 
+@mcp.tool(description="Fill form fields in existing DocuSign document")
 def fill_document_fields(envelope_id: str, field_data: Dict[str, Any]) -> Dict[str, Any]:
     """Fill form fields in existing DocuSign document."""
     logger.info(f"📝 Filling document fields for envelope: {envelope_id}")
@@ -118,6 +109,7 @@ def fill_document_fields(envelope_id: str, field_data: Dict[str, Any]) -> Dict[s
             "message": "DocuSign integration not available"
         }
 
+@mcp.tool(description="Sign existing DocuSign envelope")
 def sign_envelope(envelope_id: str, recipient_email: str, security_code: str = None) -> Dict[str, Any]:
     """Sign existing DocuSign envelope."""
     logger.info(f"✍️ Signing envelope: {envelope_id}")
@@ -153,6 +145,7 @@ def sign_envelope(envelope_id: str, recipient_email: str, security_code: str = N
             "message": "DocuSign integration not available"
         }
 
+@mcp.tool(description="Create a demo envelope for testing in DocuSign demo environment")
 def create_demo_envelope(pdf_url: str, signer_email: str = "test@example.com", signer_name: str = "Test Signer", subject: str = None, message: str = None) -> Dict[str, Any]:
     """Create a demo envelope for testing in DocuSign demo environment."""
     logger.info(f"📄 Creating demo envelope with PDF: {pdf_url}")
@@ -197,6 +190,7 @@ def create_demo_envelope(pdf_url: str, signer_email: str = "test@example.com", s
             "message": "DocuSign integration not available"
         }
 
+@mcp.tool(description="Create recipient view URL using access code for document access")
 def create_recipient_view_with_code(envelope_id: str, recipient_email: str, access_code: str, return_url: str = "https://www.docusign.com") -> Dict[str, Any]:
     """Create recipient view URL using access code for document access."""
     logger.info(f"🔗 Creating recipient view for envelope: {envelope_id}")
@@ -234,6 +228,7 @@ def create_recipient_view_with_code(envelope_id: str, recipient_email: str, acce
             "message": "DocuSign integration not available"
         }
 
+@mcp.tool(description="Debug DocuSign configuration and environment settings")
 def debug_docusign_config() -> Dict[str, Any]:
     """Debug DocuSign configuration and environment settings."""
     logger.info("🔍 Debugging DocuSign configuration")
@@ -273,204 +268,15 @@ def debug_docusign_config() -> Dict[str, Any]:
             "message": "DocuSign integration not available"
         }
 
-@app.get("/")
-async def root():
-    return {"message": "DocuSign MCP Server is running", "status": "healthy"}
-
-@app.post("/mcp")
-async def mcp_endpoint(request: Request):
-    """MCP endpoint that accepts any headers and processes JSON-RPC requests."""
-    try:
-        # Get the raw body
-        body = await request.body()
-        logger.info(f"📨 Received request: {body}")
-        
-        # Parse JSON
-        try:
-            data = json.loads(body)
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ JSON decode error: {e}")
-            return {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}
-        
-        # Handle different MCP methods
-        method = data.get("method")
-        request_id = data.get("id")
-        params = data.get("params", {})
-        
-        logger.info(f"🔧 Processing method: {method}")
-        
-        if method == "initialize":
-            return {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "result": {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {
-                        "experimental": {},
-                        "prompts": {"listChanged": True},
-                        "resources": {"subscribe": False, "listChanged": True},
-                        "tools": {"listChanged": True}
-                    },
-                    "serverInfo": {
-                        "name": "DocuSign MCP Server",
-                        "version": "1.0.0"
-                    }
-                }
-            }
-        
-        elif method == "tools/list":
-            return {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "result": {
-                    "tools": [
-                        {
-                            "name": "getenvelope",
-                            "description": "Get DocuSign envelope information and status",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "envelope_id": {"type": "string", "title": "Envelope Id"}
-                                },
-                                "required": ["envelope_id"]
-                            }
-                        },
-                        {
-                            "name": "fill_document_fields",
-                            "description": "Fill form fields in existing DocuSign document",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "envelope_id": {"type": "string", "title": "Envelope Id"},
-                                    "field_data": {"type": "object", "title": "Field Data"}
-                                },
-                                "required": ["envelope_id", "field_data"]
-                            }
-                        },
-                        {
-                            "name": "sign_envelope",
-                            "description": "Sign existing DocuSign envelope",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "envelope_id": {"type": "string", "title": "Envelope Id"},
-                                    "recipient_email": {"type": "string", "title": "Recipient Email"},
-                                    "security_code": {"type": "string", "title": "Security Code", "default": None}
-                                },
-                                "required": ["envelope_id", "recipient_email"]
-                            }
-                        },
-                        {
-                            "name": "create_demo_envelope",
-                            "description": "Create a demo envelope for testing in DocuSign demo environment",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "pdf_url": {"type": "string", "title": "Pdf Url"},
-                                    "signer_email": {"type": "string", "title": "Signer Email", "default": "test@example.com"},
-                                    "signer_name": {"type": "string", "title": "Signer Name", "default": "Test Signer"},
-                                    "subject": {"type": "string", "title": "Subject", "default": None},
-                                    "message": {"type": "string", "title": "Message", "default": None}
-                                },
-                                "required": ["pdf_url"]
-                            }
-                        },
-                        {
-                            "name": "create_recipient_view_with_code",
-                            "description": "Create recipient view URL using access code for document access",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "envelope_id": {"type": "string", "title": "Envelope Id"},
-                                    "recipient_email": {"type": "string", "title": "Recipient Email"},
-                                    "access_code": {"type": "string", "title": "Access Code"},
-                                    "return_url": {"type": "string", "title": "Return Url", "default": "https://www.docusign.com"}
-                                },
-                                "required": ["envelope_id", "recipient_email", "access_code"]
-                            }
-                        },
-                        {
-                            "name": "debug_docusign_config",
-                            "description": "Debug DocuSign configuration and environment settings",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {}
-                            }
-                        }
-                    ]
-                }
-            }
-        
-        elif method == "tools/call":
-            tool_name = params.get("name")
-            arguments = params.get("arguments", {})
-            
-            logger.info(f"🔧 Calling tool: {tool_name} with args: {arguments}")
-            
-            if tool_name == "getenvelope":
-                result = getenvelope(arguments.get("envelope_id", ""))
-            elif tool_name == "fill_document_fields":
-                result = fill_document_fields(arguments.get("envelope_id", ""), arguments.get("field_data", {}))
-            elif tool_name == "sign_envelope":
-                result = sign_envelope(
-                    arguments.get("envelope_id", ""),
-                    arguments.get("recipient_email", ""),
-                    arguments.get("security_code")
-                )
-            elif tool_name == "create_demo_envelope":
-                result = create_demo_envelope(
-                    arguments.get("pdf_url", ""),
-                    arguments.get("signer_email", "test@example.com"),
-                    arguments.get("signer_name", "Test Signer"),
-                    arguments.get("subject"),
-                    arguments.get("message")
-                )
-            elif tool_name == "create_recipient_view_with_code":
-                result = create_recipient_view_with_code(
-                    arguments.get("envelope_id", ""),
-                    arguments.get("recipient_email", ""),
-                    arguments.get("access_code", ""),
-                    arguments.get("return_url", "https://www.docusign.com")
-                )
-            elif tool_name == "debug_docusign_config":
-                result = debug_docusign_config()
-            else:
-                result = {"success": False, "error": f"Unknown tool: {tool_name}"}
-            
-            return {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "result": {
-                    "content": [{"type": "text", "text": json.dumps(result)}],
-                    "structuredContent": result,
-                    "isError": False
-                }
-            }
-        
-        else:
-            return {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "error": {"code": -32601, "message": f"Method not found: {method}"}
-            }
-    
-    except Exception as e:
-        logger.error(f"❌ Server error: {e}")
-        return {
-            "jsonrpc": "2.0",
-            "id": None,
-            "error": {"code": -32603, "message": f"Internal error: {str(e)}"}
-        }
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     host = "0.0.0.0"
     
-    print(f"Starting permissive MCP server on {host}:{port}")
+    print(f"Starting FastMCP server on {host}:{port}")
     
-    uvicorn.run(
-        app,
+    mcp.run(
+        transport="http",
         host=host,
         port=port,
-        log_level="info"
+        stateless_http=True
     )

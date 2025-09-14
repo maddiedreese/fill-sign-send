@@ -3,8 +3,9 @@
 DocuSign MCP Server using FastMCP
 Based on the InteractionCo/mcp-server-template
 """
-import os
+import json
 import sys
+import os
 import logging
 from typing import Dict, Any
 from pathlib import Path
@@ -36,9 +37,9 @@ except ImportError as e:
     USE_REAL_APIS = False
 
 # Create the MCP server
-mcp = FastMCP("DocuSign MCP Server")
+mcp = FastMCP("fill-sign-send-mcp-server")
 
-@mcp.tool(description="Get DocuSign envelope information and status")
+@mcp.tool()
 def getenvelope(envelope_id: str) -> Dict[str, Any]:
     """Get DocuSign envelope information and status."""
     logger.info(f"📋 Getting envelope status for: {envelope_id}")
@@ -77,7 +78,7 @@ def getenvelope(envelope_id: str) -> Dict[str, Any]:
             "message": "DocuSign integration not available"
         }
 
-@mcp.tool(description="Fill form fields in existing DocuSign document")
+@mcp.tool()
 def fill_document_fields(envelope_id: str, field_data: Dict[str, Any]) -> Dict[str, Any]:
     """Fill form fields in existing DocuSign document."""
     logger.info(f"📝 Filling document fields for envelope: {envelope_id}")
@@ -92,7 +93,7 @@ def fill_document_fields(envelope_id: str, field_data: Dict[str, Any]) -> Dict[s
                     "envelope_id": envelope_id,
                     "filled_fields": result.get("filled_fields", []),
                     "message": result.get("message", "Document fields filled successfully"),
-                    "next_steps": "You can now open the document for signing using 'sign_envelope'"
+                    "next_steps": "You can now open the document for signing using 'open_document_for_signing'"
                 }
             else:
                 return {
@@ -114,7 +115,7 @@ def fill_document_fields(envelope_id: str, field_data: Dict[str, Any]) -> Dict[s
             "message": "DocuSign integration not available"
         }
 
-@mcp.tool(description="Sign existing DocuSign envelope")
+@mcp.tool()
 def sign_envelope(envelope_id: str, recipient_email: str, security_code: str = None) -> Dict[str, Any]:
     """Sign existing DocuSign envelope."""
     logger.info(f"✍️ Signing envelope: {envelope_id}")
@@ -150,7 +151,7 @@ def sign_envelope(envelope_id: str, recipient_email: str, security_code: str = N
             "message": "DocuSign integration not available"
         }
 
-@mcp.tool(description="Create a demo envelope for testing in DocuSign demo environment")
+@mcp.tool()
 def create_demo_envelope(pdf_url: str, signer_email: str = "test@example.com", signer_name: str = "Test Signer", subject: str = None, message: str = None) -> Dict[str, Any]:
     """Create a demo envelope for testing in DocuSign demo environment."""
     logger.info(f"📄 Creating demo envelope with PDF: {pdf_url}")
@@ -195,7 +196,7 @@ def create_demo_envelope(pdf_url: str, signer_email: str = "test@example.com", s
             "message": "DocuSign integration not available"
         }
 
-@mcp.tool(description="Create recipient view URL using access code for document access")
+@mcp.tool()
 def create_recipient_view_with_code(envelope_id: str, recipient_email: str, access_code: str, return_url: str = "https://www.docusign.com") -> Dict[str, Any]:
     """Create recipient view URL using access code for document access."""
     logger.info(f"🔗 Creating recipient view for envelope: {envelope_id}")
@@ -233,7 +234,7 @@ def create_recipient_view_with_code(envelope_id: str, recipient_email: str, acce
             "message": "DocuSign integration not available"
         }
 
-@mcp.tool(description="Debug DocuSign configuration and environment settings")
+@mcp.tool()
 def debug_docusign_config() -> Dict[str, Any]:
     """Debug DocuSign configuration and environment settings."""
     logger.info("🔍 Debugging DocuSign configuration")
@@ -274,14 +275,5 @@ def debug_docusign_config() -> Dict[str, Any]:
         }
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    host = "0.0.0.0"
-    
-    print(f"Starting FastMCP server on {host}:{port}")
-    
-    mcp.run(
-        transport="http",
-        host=host,
-        port=port,
-        stateless_http=True
-    )
+    import uvicorn
+    uvicorn.run(mcp, host="0.0.0.0", port=8000)

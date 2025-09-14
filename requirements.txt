@@ -1,4 +1,4 @@
-fastapi>=0.104.0
+fastmcp>=2.12.0
 uvicorn>=0.35.0
 pypdfform>=1.4.30
 docusign-esign>=3.24.0

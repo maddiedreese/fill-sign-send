@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Doc Filling + E-Signing MCP Server - Simple Version
-Handles MCP tools through SSE endpoint for Poke integration
+Doc Filling + E-Signing MCP Server - Production Ready with SSE + MCP
+Handles both SSE and MCP functionality for Poke integration
 """
 import json
 import sys
@@ -19,8 +19,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import uvicorn
+import asyncio
 
 # Import real implementations with proper error handling
 try:
@@ -66,6 +67,90 @@ if not USE_REAL_APIS:
 
 app = FastAPI()
 
+# MCP Tools Definition
+MCP_TOOLS = [
+    {
+        "name": "detect_pdf_fields",
+        "description": "Detect form fields in a PDF document",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_url": {"type": "string", "description": "URL or path to the PDF file"}
+            },
+            "required": ["file_url"]
+        }
+    },
+    {
+        "name": "fill_pdf_fields",
+        "description": "Fill form fields in a PDF document",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_url": {"type": "string", "description": "URL or path to the PDF file"},
+                "field_values": {"type": "object", "description": "Dictionary of field names and values"}
+            },
+            "required": ["file_url", "field_values"]
+        }
+    },
+    {
+        "name": "send_for_signature",
+        "description": "Send a document for e-signature via DocuSign",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_url": {"type": "string", "description": "URL or path to the PDF file"},
+                "recipient_email": {"type": "string", "description": "Email address of the recipient"},
+                "recipient_name": {"type": "string", "description": "Name of the recipient"},
+                "subject": {"type": "string", "description": "Subject line for the email"},
+                "message": {"type": "string", "description": "Message body for the email"}
+            },
+            "required": ["file_url", "recipient_email", "recipient_name"]
+        }
+    },
+    {
+        "name": "check_signature_status",
+        "description": "Check the status of a signature request",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "envelope_id": {"type": "string", "description": "Envelope ID from the signature request"}
+            },
+            "required": ["envelope_id"]
+        }
+    },
+    {
+        "name": "download_signed_pdf",
+        "description": "Download the signed PDF document",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "envelope_id": {"type": "string", "description": "Envelope ID from the signature request"}
+            },
+            "required": ["envelope_id"]
+        }
+    },
+    {
+        "name": "notify_poke",
+        "description": "Send a notification to Poke",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "message": {"type": "string", "description": "Message to send to Poke"},
+                "attachments": {"type": "array", "description": "List of attachments"}
+            },
+            "required": ["message"]
+        }
+    },
+    {
+        "name": "get_server_info",
+        "description": "Get server information and configuration status",
+        "inputSchema": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+]
+
 # Tool handlers
 def handle_detect_pdf_fields(args):
     """Handle detect_pdf_fields tool call."""
@@ -98,7 +183,7 @@ def handle_fill_pdf_fields(args):
 
 def handle_send_for_signature(args):
     """Handle send_for_signature tool call."""
-    logger.info(f"📧 send_for_signature called with args: {args}")
+    logger.info(f"�� send_for_signature called with args: {args}")
     try:
         file_url = args.get("file_url", "")
         recipient_email = args.get("recipient_email", "")
@@ -223,10 +308,112 @@ TOOL_HANDLERS = {
 async def root():
     return {"message": "Doc Filling + E-Signing MCP Server", "status": "running"}
 
+@app.post("/mcp")
+async def mcp_endpoint(request: Request):
+    try:
+        logger.info(f"📨 MCP request received: {request.method}")
+        
+        # Handle POST request body if present
+        if request.method == "POST":
+            try:
+                body = await request.body()
+                if body:
+                    # Parse the MCP request
+                    mcp_request = json.loads(body.decode())
+                    logger.info(f"📨 MCP request: {mcp_request}")
+                    
+                    # Process MCP request and send response
+                    if mcp_request.get("method") == "initialize":
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": mcp_request.get("id"),
+                            "result": {
+                                "protocolVersion": "2024-11-05",
+                                "capabilities": {
+                                    "tools": {}
+                                },
+                                "serverInfo": {
+                                    "name": "Doc Filling + E-Signing MCP Server",
+                                    "version": "1.0.0"
+                                }
+                            }
+                        }
+                        return JSONResponse(content=response)
+                    
+                    elif mcp_request.get("method") == "tools/list":
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": mcp_request.get("id"),
+                            "result": {
+                                "tools": MCP_TOOLS
+                            }
+                        }
+                        return JSONResponse(content=response)
+                    
+                    elif mcp_request.get("method") == "tools/call":
+                        tool_name = mcp_request.get("params", {}).get("name")
+                        tool_args = mcp_request.get("params", {}).get("arguments", {})
+                        
+                        logger.info(f"🔧 Tool call: {tool_name} with args: {tool_args}")
+                        
+                        if tool_name in TOOL_HANDLERS:
+                            result = TOOL_HANDLERS[tool_name](tool_args)
+                            logger.info(f"✅ Tool result: {result}")
+                            response = {
+                                "jsonrpc": "2.0",
+                                "id": mcp_request.get("id"),
+                                "result": {
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": json.dumps(result, indent=2)
+                                        }
+                                    ]
+                                }
+                            }
+                            return JSONResponse(content=response)
+                        else:
+                            logger.error(f"❌ Tool not found: {tool_name}")
+                            response = {
+                                "jsonrpc": "2.0",
+                                "id": mcp_request.get("id"),
+                                "error": {
+                                    "code": -32601,
+                                    "message": f"Tool '{tool_name}' not found"
+                                }
+                            }
+                            return JSONResponse(content=response)
+                    
+                    else:
+                        logger.error(f"❌ Method not found: {mcp_request.get('method')}")
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": mcp_request.get("id"),
+                            "error": {
+                                "code": -32601,
+                                "message": f"Method '{mcp_request.get('method')}' not found"
+                            }
+                        }
+                        return JSONResponse(content=response)
+                
+            except json.JSONDecodeError:
+                logger.error("❌ Invalid JSON in request")
+                return JSONResponse(content={"error": "Invalid JSON"}, status_code=400)
+            except Exception as e:
+                logger.error(f"❌ Request processing error: {e}")
+                return JSONResponse(content={"error": str(e)}, status_code=500)
+        
+        return JSONResponse(content={"message": "Doc Filling + E-Signing MCP Server", "status": "running"})
+    
+    except Exception as e:
+        logger.error(f"❌ MCP endpoint error: {e}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
 @app.get("/sse")
 async def sse_endpoint(request: Request, tool: str = None, args: str = None):
     """
-    SSE endpoint for MCP tool support - Poke can call this endpoint with tool parameters.
+    Server-Sent Events endpoint for real-time updates with MCP tool support.
+    Poke can call this endpoint with tool parameters to execute MCP functions.
     """
     logger.info(f"📡 SSE request received - tool: {tool}, args: {args}")
     
@@ -247,6 +434,8 @@ async def sse_endpoint(request: Request, tool: str = None, args: str = None):
             if tool in TOOL_HANDLERS:
                 result = TOOL_HANDLERS[tool](tool_args)
                 logger.info(f"✅ Tool result: {result}")
+                
+                # Return the result as JSON instead of streaming
                 return JSONResponse(content=result)
             else:
                 logger.error(f"❌ Tool not found: {tool}")
@@ -261,7 +450,7 @@ async def sse_endpoint(request: Request, tool: str = None, args: str = None):
     return JSONResponse(content={
         "message": "Doc Filling + E-Signing MCP Server",
         "status": "running",
-        "available_tools": list(TOOL_HANDLERS.keys()),
+        "available_tools": [tool["name"] for tool in MCP_TOOLS],
         "usage": "Add ?tool=<tool_name>&args=<json_args> to execute a tool"
     })
 

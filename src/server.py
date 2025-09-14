@@ -28,7 +28,7 @@ import uvicorn
 try:
     from settings import settings
     from pdf_utils import extract_acroform_fields, fill_and_flatten
-    from esign_docusign import send_for_signature_docusign, check_signature_status_docusign, download_signed_pdf_docusign
+    from esign_docusign import send_for_signature_docusign, check_signature_status_docusign, download_signed_pdf_docusign, get_envelope_status_docusign
 
     logger.info("✅ Successfully imported all modules")
     USE_REAL_APIS = True

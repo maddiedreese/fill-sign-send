@@ -375,21 +375,73 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"❌ get_envelope_status error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to get envelope status"}
 
-def handle_get_envelope_id_from_page(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle getting envelope ID from DocuSign document page."""
+def handle_extract_envelope_id_from_document(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle extracting envelope ID from document content."""
     try:
-        signing_url = args.get("signing_url")
-        envelope_id = args.get("envelope_id")
+        document_url = args.get("document_url")
+        document_text = args.get("document_text")
         
-        if not signing_url:
-            return {"success": False, "error": "signing_url is required", "message": "Please provide the DocuSign signing URL"}
+        if not document_url and not document_text:
+            return {"success": False, "error": "document_url or document_text is required", "message": "Please provide either a document URL or the document text content"}
+        
+        logger.info(f"📋 Extracting envelope ID from document")
+        
+        # If we have a URL, download the document first
+        if document_url:
+            logger.info(f"📥 Downloading document from URL: {document_url}")
+            filename = download_file_from_url(document_url)
+            if not filename:
+                return {"success": False, "error": "Failed to download document", "message": "Could not download document from URL"}
+            
+            # Read the document content
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    document_text = f.read()
+                # Clean up the temporary file
+                os.remove(filename)
+            except Exception as e:
+                logger.error(f"❌ Failed to read document: {e}")
+                return {"success": False, "error": str(e), "message": "Failed to read document content"}
+        
+        if not document_text:
+            return {"success": False, "error": "No document content available", "message": "Could not extract document content"}
+        
+        # Extract envelope ID from document text using various patterns
+        import re
+        
+        # Common patterns for envelope ID in DocuSign documents
+        patterns = [
+            r'envelope[_\s]*id[:\s]*([a-f0-9-]{36})',  # "envelope id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            r'envelope[_\s]*ID[:\s]*([a-f0-9-]{36})',  # "envelope ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            r'envelope[_\s]*number[:\s]*([a-f0-9-]{36})',  # "envelope number: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})',  # Standard UUID pattern
+            r'docusign[_\s]*envelope[:\s]*([a-f0-9-]{36})',  # "docusign envelope: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+        ]
+        
+        envelope_id = None
+        for pattern in patterns:
+            matches = re.findall(pattern, document_text, re.IGNORECASE)
+            if matches:
+                envelope_id = matches[0]
+                logger.info(f"✅ Found envelope ID using pattern: {pattern}")
+                break
         
         if not envelope_id:
-            return {"success": False, "error": "envelope_id is required", "message": "Please provide the envelope ID from the DocuSign document page"}
+            # Try to find any UUID-like pattern
+            uuid_pattern = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
+            uuid_matches = re.findall(uuid_pattern, document_text, re.IGNORECASE)
+            if uuid_matches:
+                envelope_id = uuid_matches[0]
+                logger.info(f"✅ Found potential envelope ID (UUID pattern): {envelope_id}")
+            else:
+                return {
+                    "success": False, 
+                    "error": "No envelope ID found", 
+                    "message": "Could not find envelope ID in document content. Please check the document manually.",
+                    "document_preview": document_text[:500] + "..." if len(document_text) > 500 else document_text
+                }
         
-        logger.info(f"📋 Processing envelope ID from DocuSign page")
-        logger.info(f"🔗 Signing URL: {signing_url}")
-        logger.info(f"📄 Envelope ID: {envelope_id}")
+        logger.info(f"📄 Extracted envelope ID: {envelope_id}")
         
         if USE_REAL_APIS:
             try:
@@ -398,14 +450,18 @@ def handle_get_envelope_id_from_page(args: Dict[str, Any]) -> Dict[str, Any]:
                 envelope_status = get_envelope_status_docusign(envelope_id)
                 
                 if not envelope_status.get("success"):
-                    return {"success": False, "error": envelope_status.get("error"), "message": "Invalid envelope ID or failed to verify"}
+                    return {
+                        "success": False, 
+                        "error": envelope_status.get("error"), 
+                        "message": "Invalid envelope ID or failed to verify",
+                        "extracted_id": envelope_id
+                    }
                 
                 return {
                     "success": True,
                     "envelope_id": envelope_id,
-                    "signing_url": signing_url,
                     "envelope_status": envelope_status.get("envelope_status"),
-                    "message": "Successfully verified envelope ID from DocuSign page",
+                    "message": "Successfully extracted and verified envelope ID from document",
                     "next_steps": "You can now use this envelope ID with other tools like 'get_envelope_status', 'fill_envelope', or 'submit_envelope'"
                 }
                 
@@ -413,23 +469,27 @@ def handle_get_envelope_id_from_page(args: Dict[str, Any]) -> Dict[str, Any]:
                 logger.error(f"❌ DocuSign verification error: {e}")
                 import traceback
                 logger.error(f"❌ Traceback: {traceback.format_exc()}")
-                return {"success": False, "error": str(e), "message": "Failed to verify envelope ID"}
+                return {
+                    "success": False, 
+                    "error": str(e), 
+                    "message": "Failed to verify envelope ID",
+                    "extracted_id": envelope_id
+                }
         else:
             logger.warning("⚠️  Using MOCK DocuSign API")
             return {
                 "success": True,
                 "envelope_id": envelope_id,
-                "signing_url": signing_url,
                 "envelope_status": "sent",
-                "message": "Successfully processed envelope ID from DocuSign page (MOCK)",
+                "message": "Successfully extracted envelope ID from document (MOCK)",
                 "next_steps": "You can now use this envelope ID with other tools like 'get_envelope_status', 'fill_envelope', or 'submit_envelope'"
             }
             
     except Exception as e:
-        logger.error(f"❌ get_envelope_id_from_page error: {e}")
+        logger.error(f"❌ extract_envelope_id_from_document error: {e}")
         import traceback
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
-        return {"success": False, "error": str(e), "message": "Failed to process envelope ID from page"}
+        return {"success": False, "error": str(e), "message": "Failed to extract envelope ID from document"}
 
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
@@ -440,7 +500,7 @@ TOOL_HANDLERS.update({
     "get_envelope_status": handle_get_envelope_status,
     "send_for_signature": handle_send_for_signature,
     "get_server_info": handle_get_server_info,
-    "get_envelope_id_from_page": handle_get_envelope_id_from_page
+    "extract_envelope_id_from_document": handle_extract_envelope_id_from_document
 })
 
 def create_test_pdf():
@@ -574,15 +634,15 @@ async def mcp_endpoint(request: Request):
                             }
                         },
                         {
-                            "name": "get_envelope_id_from_page",
-                            "description": "Get and verify envelope ID from DocuSign document page",
+                            "name": "extract_envelope_id_from_document",
+                            "description": "Extract envelope ID from document content or URL",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "signing_url": {"type": "string", "description": "DocuSign signing URL from email"},
-                                    "envelope_id": {"type": "string", "description": "Envelope ID found on the DocuSign document page"}
+                                    "document_url": {"type": "string", "description": "URL to the document (optional if document_text provided)"},
+                                    "document_text": {"type": "string", "description": "Document text content (optional if document_url provided)"}
                                 },
-                                "required": ["signing_url", "envelope_id"]
+                                "required": []
                             }
                         }
                     ]
@@ -711,15 +771,15 @@ async def sse_endpoint(request: Request):
                             }
                         },
                         {
-                            "name": "get_envelope_id_from_page",
-                            "description": "Get and verify envelope ID from DocuSign document page",
+                            "name": "extract_envelope_id_from_document",
+                            "description": "Extract envelope ID from document content or URL",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "signing_url": {"type": "string", "description": "DocuSign signing URL from email"},
-                                    "envelope_id": {"type": "string", "description": "Envelope ID found on the DocuSign document page"}
+                                    "document_url": {"type": "string", "description": "URL to the document (optional if document_text provided)"},
+                                    "document_text": {"type": "string", "description": "Document text content (optional if document_url provided)"}
                                 },
-                                "required": ["signing_url", "envelope_id"]
+                                "required": []
                             }
                         }
                     ]

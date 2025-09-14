@@ -405,7 +405,10 @@ def get_server_info_impl() -> Dict[str, Any]:
 @app.get("/mcp")
 async def mcp_get():
     """Handle GET requests to MCP endpoint for health checks."""
-    return {"message": "MCP server is running", "status": "healthy"}async def mcp_endpoint(request: MCPRequest):
+    return {"message": "MCP server is running", "status": "healthy"}
+
+@app.post("/mcp")
+async def mcp_endpoint(request: MCPRequest):
     """Main MCP protocol endpoint."""
     try:
         method = request.method

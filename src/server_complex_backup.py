@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+"""
+DocuSign MCP Server using FastMCP
+Based on the InteractionCo/mcp-server-template
+"""
 import os
 import sys
 import logging
@@ -31,6 +35,7 @@ except ImportError as e:
     logger.error(f"⚠️  Import error: {e}")
     USE_REAL_APIS = False
 
+# Create the MCP server
 mcp = FastMCP("DocuSign MCP Server")
 
 @mcp.tool(description="Get DocuSign envelope information and status")

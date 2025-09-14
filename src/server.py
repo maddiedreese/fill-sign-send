@@ -525,36 +525,7 @@ async def health():
 # SSE endpoint for Poke compatibility
 @app.get("/sse")
 @app.post("/sse")
-async def sse_endpoint(request: Request = None):
+async def sse_endpoint(request: Request):
     """SSE endpoint for Poke MCP compatibility."""
-    from fastapi.responses import StreamingResponse
-    import asyncio
-    
-    async def event_generator():
-        # Send initial connection event
-        yield f"data: {json.dumps({'type': 'connected', 'message': 'MCP server connected'})}\n\n"
-        
-        # Keep connection alive
-        while True:
-            await asyncio.sleep(30)  # Send heartbeat every 30 seconds
-            yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': time.time()})}\n\n"
-    
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Cache-Control"
-        }
-    )
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "server:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        log_level="info"
-    )
+    from .sse_handler import handle_mcp_sse
+    return await handle_mcp_sse(request)

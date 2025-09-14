@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional, Union
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -528,4 +529,31 @@ if __name__ == "__main__":
         host=settings.HOST,
         port=settings.PORT,
         log_level="info"
+    )
+
+# SSE endpoint for Poke compatibility
+@app.get("/sse")
+async def sse_endpoint():
+    """SSE endpoint for Poke MCP compatibility."""
+    from fastapi.responses import StreamingResponse
+    import asyncio
+    
+    async def event_generator():
+        # Send initial connection event
+        yield f"data: {json.dumps({'type': 'connected', 'message': 'MCP server connected'})}\n\n"
+        
+        # Keep connection alive
+        while True:
+            await asyncio.sleep(30)  # Send heartbeat every 30 seconds
+            yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': time.time()})}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control"
+        }
     )

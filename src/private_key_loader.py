@@ -50,6 +50,9 @@ def load_private_key_from_env() -> str:
     # Ensure proper PEM format
     private_key = private_key.strip()
     
+    # Convert \n characters to actual newlines (for environment variables)
+    private_key = private_key.replace('\\n', '\n')
+    
     # The private key should already have proper headers from .env
     if not private_key.startswith("-----BEGIN"):
         raise ValueError("Private key must have proper PEM headers")

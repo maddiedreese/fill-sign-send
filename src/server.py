@@ -45,24 +45,6 @@ class MockSettings:
         return False
     ENVIRONMENT = "production"
 
-def detect_pdf_fields(file_url):
-    return [{"name": "field1", "type": "text"}, {"name": "field2", "type": "text"}]
-
-def fill_pdf_fields(file_url, field_values):
-    return {"filled_pdf_url": f"file://filled_{os.path.basename(file_url)}"}
-
-def send_for_signature_docusign(file_url, recipient_email, recipient_name, subject, message):
-    return {"envelope_id": "mock-envelope-123"}
-
-def check_signature_status_docusign(envelope_id):
-    return {"status": "completed"}
-
-def download_signed_pdf_docusign(envelope_id):
-    return {"signed_pdf_url": f"file://signed_{envelope_id}.pdf"}
-
-# Use mock settings if real ones failed
-if not USE_REAL_APIS:
-    settings = MockSettings()
     logger.warning("⚠️  Using mock implementations for missing modules")
 
 app = FastAPI()

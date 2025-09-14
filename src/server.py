@@ -263,6 +263,73 @@ def handle_submit_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"❌ submit_envelope error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to submit envelope"}
 
+def handle_getenvelope(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle getting DocuSign envelope from link or security code."""
+    try:
+        envelope_id = args.get("envelope_id")
+        link = args.get("link")
+        security_code = args.get("security_code")
+        
+        logger.info(f"📋 getenvelope called with envelope_id: {envelope_id}, link: {link}, security_code: {security_code}")
+        
+        # If we have a link, extract envelope ID from it
+        if link and not envelope_id:
+            if "docusign.net/signing/documents/" in link:
+                # Extract envelope ID from DocuSign signing link
+                import re
+                match = re.search(r"/signing/documents/([a-f0-9-]+)", link)
+                if match:
+                    envelope_id = match.group(1)
+                    logger.info(f"📋 Extracted envelope_id from link: {envelope_id}")
+                else:
+                    return {"success": False, "error": "Could not extract envelope ID from link", "message": "Invalid DocuSign signing link"}
+            else:
+                return {"success": False, "error": "Invalid link format", "message": "Link must be a DocuSign signing link"}
+        
+        # If we have a security code, we need to search for the envelope
+        if security_code and not envelope_id:
+            # For now, return an error as we need to implement envelope search by security code
+            return {"success": False, "error": "Security code lookup not implemented", "message": "Please provide envelope_id or link instead"}
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id, link, or security_code is required", "message": "Please provide envelope_id, DocuSign signing link, or security_code"}
+        
+        # Now get the envelope details using the envelope ID
+        if USE_REAL_APIS:
+            logger.info("🔗 Using REAL DocuSign API")
+            try:
+                result = get_envelope_status_docusign(envelope_id)
+                
+                logger.info(f"📋 DocuSign result: {result}")
+                
+                if result.get("success"):
+                    return {
+                        "success": True, 
+                        "envelope_id": result["envelope_id"], 
+                        "status": result["status"],
+                        "created_date": result.get("created_date"),
+                        "sent_date": result.get("sent_date"),
+                        "completed_date": result.get("completed_date"),
+                        "recipients": result.get("recipients", []),
+                        "message": "Envelope retrieved successfully"
+                    }
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.error(f"❌ DocuSign API error: {error_msg}")
+                    return {"success": False, "error": error_msg, "message": "Failed to get envelope"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to get envelope"}
+        else:
+            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+            
+    except Exception as e:
+        logger.error(f"❌ getenvelope error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to get envelope"}
+
 def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle getting DocuSign envelope status."""
     try:
@@ -310,7 +377,7 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
 
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
-    "getenvelope": handle_get_envelope_status,
+    "getenvelope": handle_getenvelope,
     "fill_envelope": handle_fill_envelope,
     "sign_envelope": handle_sign_envelope,
     "submit_envelope": handle_submit_envelope,

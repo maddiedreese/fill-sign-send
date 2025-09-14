@@ -308,7 +308,6 @@ def fill_envelope_docusign(envelope_id: str, field_data: Dict[str, Any]) -> Dict
             text_tabs.append(text_tab)
         
         # Update envelope with filled data
-        from docusign_esign.models import EnvelopeDefinition, Recipients, Signer
         
         # Get existing recipients
         recipients = envelope.recipients

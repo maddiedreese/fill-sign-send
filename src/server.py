@@ -520,16 +520,7 @@ async def health():
     """Health check endpoint."""
     return {"status": "healthy"}
 
-if __name__ == "__main__":
-    print("Starting Doc Filling + E-Signing MCP server on 0.0.0.0:8000")
-    print("MCP endpoint will be available at: http://0.0.0.0:8000/mcp")
-    
-    uvicorn.run(
-        app,
-        host=settings.HOST,
-        port=settings.PORT,
-        log_level="info"
-    )
+
 
 # SSE endpoint for Poke compatibility
 @app.get("/sse")
@@ -556,4 +547,13 @@ async def sse_endpoint():
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Cache-Control"
         }
+    )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "server:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        log_level="info"
     )

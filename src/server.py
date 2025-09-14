@@ -224,7 +224,7 @@ async def sse_post_endpoint(request: Request):
             
             if tool:
                 logger.info(f"🔧 Executing tool: {tool} with args: {args}")
-                
+                logger.info(f"🔍 Available tools in TOOL_HANDLERS: {list(TOOL_HANDLERS.keys())}")                
                 if tool in TOOL_HANDLERS:
                     result = TOOL_HANDLERS[tool](args)
                     logger.info(f"✅ Tool result: {result}")

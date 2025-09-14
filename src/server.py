@@ -9,7 +9,7 @@ import sys
 import json
 import logging
 from typing import Dict, Any, List, Optional, Union
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 import uvicorn
 import time
@@ -524,7 +524,8 @@ async def health():
 
 # SSE endpoint for Poke compatibility
 @app.get("/sse")
-async def sse_endpoint():
+@app.post("/sse")
+async def sse_endpoint(request: Request = None):
     """SSE endpoint for Poke MCP compatibility."""
     from fastapi.responses import StreamingResponse
     import asyncio

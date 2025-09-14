@@ -284,18 +284,17 @@ def fill_envelope_docusign(envelope_id: str, field_data: Dict[str, Any]) -> Dict
                 "message": "Only sent envelopes can be filled"
             }
         
-        # Create document update request
-        from docusign_esign.models import Document, Tabs, Text, SignHere
+        # Get envelope documents
+        documents = envelopes_api.list_documents(account_id=account_id, envelope_id=envelope_id)
         
-        # Get the first document
-        if not envelope.documents or len(envelope.documents) == 0:
+        if not documents.envelope_documents or len(documents.envelope_documents) == 0:
             return {
                 "success": False,
                 "error": "No documents found in envelope",
                 "message": "Cannot fill envelope without documents"
             }
         
-        document = envelope.documents[0]
+        document = documents.envelope_documents[0]
         
         # Create tabs for text fields
         text_tabs = []
@@ -600,4 +599,59 @@ def create_recipient_view_with_code(envelope_id: str, recipient_email: str, acce
             "success": False,
             "error": str(e),
             "message": f"Exception creating recipient view: {str(e)}"
+        }
+
+def access_document_with_code(access_code: str, recipient_email: str, field_data: Dict[str, Any] = None, return_url: str = "https://www.docusign.com") -> Dict[str, Any]:
+    """
+    Access DocuSign document using access code and complete the workflow.
+    
+    This function provides a comprehensive workflow for accessing documents with access codes:
+    1. Explains the DocuSign limitation (no direct API to find envelope by access code)
+    2. Provides alternative approaches
+    3. Offers to help with the complete workflow once envelope ID is available
+    
+    Args:
+        access_code: Access code from email
+        recipient_email: Recipient email address
+        field_data: Optional form field data to fill
+        return_url: URL to redirect after signing
+        
+    Returns:
+        Dict with success status and workflow guidance
+    """
+    try:
+        if not settings.validate_docusign_config():
+            return {"success": False, "error": "DocuSign not configured", "message": "DocuSign configuration is missing or invalid"}
+        
+        return {
+            "success": True,
+            "access_code": access_code,
+            "recipient_email": recipient_email,
+            "message": "Access code workflow guidance provided",
+            "docusign_limitation": "DocuSign API doesn't support finding envelopes by access code directly",
+            "workflow_required": [
+                "1. ✅ Poke extracts access code from email",
+                "2. ❌ Need envelope ID (from email, document, or database)",
+                "3. 🔗 Use 'create_recipient_view_with_code' with envelope ID + access code",
+                "4. 📝 Use 'fill_document_fields' to fill form fields (if needed)",
+                "5. ✍️ Use 'sign_envelope' to complete signing"
+            ],
+            "next_steps": [
+                "Find the envelope ID from the DocuSign email or document",
+                "Use the envelope ID with the access code to create a signing URL",
+                "Complete the signing workflow"
+            ],
+            "available_tools": {
+                "create_recipient_view_with_code": "Create signing URL with envelope ID + access code",
+                "fill_document_fields": "Fill form fields in the document",
+                "sign_envelope": "Complete the signing process"
+            },
+            "example_workflow": f"Once you have the envelope ID, call 'create_recipient_view_with_code' with: envelope_id, recipient_email='{recipient_email}', access_code='{access_code}'"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Exception in access document workflow: {str(e)}"
         }

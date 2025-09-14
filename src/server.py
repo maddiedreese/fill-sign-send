@@ -423,12 +423,31 @@ def download_file_from_url(url):
 
 @app.get("/")
 async def root():
+
+@app.get("/debug")
+async def debug_endpoint(request: Request):
+    """Debug endpoint to log all requests from Poke."""
+    logger.info(f"🔍 DEBUG: GET request from {request.client.host}")
+    logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
+    logger.info(f"🔍 DEBUG: Query params: {dict(request.query_params)}")
+    return {"message": "Debug endpoint", "client_ip": str(request.client.host), "headers": dict(request.headers)}
+
+@app.post("/debug")
+async def debug_post_endpoint(request: Request):
+    """Debug endpoint to log all POST requests from Poke."""
+    body = await request.body()
+    logger.info(f"🔍 DEBUG: POST request from {request.client.host}")
+    logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
+    logger.info(f"🔍 DEBUG: Body: {body.decode() if body else "No body"}")
+    return {"message": "Debug POST endpoint", "client_ip": str(request.client.host), "body": body.decode() if body else "No body"}
     return {"message": "Doc Filling + E-Signing MCP Server", "status": "running"}
 
 @app.get("/sse")
 async def sse_endpoint(request: Request, tool: str = None, args: str = None):
     """SSE endpoint for MCP tool support."""
     logger.info(f"📡 SSE GET request - tool: {tool}, args: {args}")
+    logger.info(f"🔍 DEBUG: Client IP: {request.client.host}")
+    logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
     
     if tool:
         try:
@@ -468,6 +487,8 @@ async def sse_post_endpoint(request: Request):
         if body:
             data = json.loads(body.decode())
             logger.info(f"📨 SSE POST request: {data}")
+            logger.info(f"🔍 DEBUG: Client IP: {request.client.host}")
+            logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
             
             tool = data.get("tool")
             args = data.get("args", {})

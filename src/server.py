@@ -8,6 +8,7 @@ import sys
 import os
 import time
 import logging
+from typing import Dict, Any
 import requests
 from pathlib import Path
 
@@ -166,15 +167,6 @@ def handle_get_server_info(args):
         logger.error(f"❌ get_server_info error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to get server info"}
 
-# Tool dispatcher
-TOOL_HANDLERS = {
-    "fill_envelope": handle_fill_envelope,
-    "sign_envelope": handle_sign_envelope,
-    "submit_envelope": handle_submit_envelope,
-    "get_envelope_status": handle_get_envelope_status,
-    "send_for_signature": handle_send_for_signature,
-    "get_server_info": handle_get_server_info
-}
 
 @app.get("/")
 async def root():
@@ -405,7 +397,7 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
                         "sent_date": result.get("sent_date"),
                         "completed_date": result.get("completed_date"),
                         "recipients": result.get("recipients", []),
-                        "message": result["message"]
+
                     }
                 else:
                     error_msg = result.get("error", "Unknown error")
@@ -423,3 +415,13 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"❌ get_envelope_status error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to get envelope status"}
+
+# Tool dispatcher
+TOOL_HANDLERS = {
+    "fill_envelope": handle_fill_envelope,
+    "sign_envelope": handle_sign_envelope,
+    "submit_envelope": handle_submit_envelope,
+    "get_envelope_status": handle_get_envelope_status,
+    "send_for_signature": handle_send_for_signature,
+    "get_server_info": handle_get_server_info
+}

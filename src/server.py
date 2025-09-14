@@ -569,75 +569,131 @@ async def mcp_endpoint(request: Request):
             }
         }, status_code=500)
 
-@app.get("/sse")
-async def sse_endpoint(request: Request, tool: str = None, args: str = None):
-    """SSE endpoint for MCP tool support."""
-    logger.info(f"📡 SSE GET request - tool: {tool}, args: {args}")
-    logger.info(f"🔍 DEBUG: Client IP: {request.client.host}")
-    logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
-    
-    if tool:
-        try:
-            tool_args = {}
-            if args:
-                try:
-                    tool_args = json.loads(args)
-                except json.JSONDecodeError:
-                    logger.error(f"❌ Invalid JSON in args: {args}")
-                    tool_args = {}
-            
-            logger.info(f"🔧 Executing tool: {tool} with args: {tool_args}")
-            
-            if tool in TOOL_HANDLERS:
-                result = TOOL_HANDLERS[tool](tool_args)
-                logger.info(f"✅ Tool result: {result}")
-                return JSONResponse(content=result)
-            else:
-                logger.error(f"❌ Tool not found: {tool}")
-                return JSONResponse(content={"error": f"Tool '{tool}' not found"}, status_code=404)
-                
-        except Exception as e:
-            logger.error(f"❌ Tool execution error: {e}")
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-    
-    return JSONResponse(content={
-        "message": "Doc Filling + E-Signing MCP Server",
-        "status": "running",
-        "available_tools": list(TOOL_HANDLERS.keys())
-    })
-
 @app.post("/sse")
-async def sse_post_endpoint(request: Request):
-    """POST endpoint for SSE with MCP tool support."""
+async def sse_endpoint(request: Request):
+    """SSE endpoint for MCP tool support with proper MCP protocol."""
     try:
         body = await request.body()
-        if body:
-            data = json.loads(body.decode())
-            logger.info(f"📨 SSE POST request: {data}")
-            logger.info(f"🔍 DEBUG: Client IP: {request.client.host}")
-            logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
+        data = json.loads(body) if body else {}
+        
+        logger.info(f"📡 SSE POST request from {request.client.host}")
+        logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
+        logger.info(f"🔍 DEBUG: Body: {data}")
+        
+        # Handle MCP protocol messages
+        if data.get("method") == "initialize":
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "result": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {
+                            "listChanged": True
+                        }
+                    },
+                    "serverInfo": {
+                        "name": "fill-sign-send-mcp-server",
+                        "version": "1.0.0"
+                    }
+                }
+            })
+        
+        elif data.get("method") == "tools/list":
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "result": {
+                    "tools": [
+                        {
+                            "name": "getenvelope",
+                            "description": "Get envelope information",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"}
+                                },
+                                "required": ["envelope_id"]
+                            }
+                        },
+                        {
+                            "name": "fill_envelope",
+                            "description": "Fill PDF form fields",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "form_data": {"type": "object", "description": "Form field data"}
+                                },
+                                "required": ["pdf_url", "form_data"]
+                            }
+                        },
+                        {
+                            "name": "sign_envelope",
+                            "description": "Send document for signature",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "signer_email": {"type": "string", "description": "Signer email address"},
+                                    "signer_name": {"type": "string", "description": "Signer name"}
+                                },
+                                "required": ["pdf_url", "signer_email", "signer_name"]
+                            }
+                        }
+                    ]
+                }
+            })
+        
+        elif data.get("method") == "tools/call":
+            tool_name = data.get("params", {}).get("name")
+            tool_args = data.get("params", {}).get("arguments", {})
             
-            tool = data.get("tool")
-            args = data.get("args", {})
-            
-            if tool:
-                logger.info(f"🔧 Executing tool: {tool} with args: {args}")
-                logger.info(f"🔍 Available tools in TOOL_HANDLERS: {list(TOOL_HANDLERS.keys())}")                
-                if tool in TOOL_HANDLERS:
-                    result = TOOL_HANDLERS[tool](args)
-                    logger.info(f"✅ Tool result: {result}")
-                    return JSONResponse(content=result)
-                else:
-                    logger.error(f"❌ Tool not found: {tool}")
-                    return JSONResponse(content={"error": f"Tool '{tool}' not found"}, status_code=404)
+            if tool_name in TOOL_HANDLERS:
+                result = TOOL_HANDLERS[tool_name](tool_args)
+                return JSONResponse(content={
+                    "jsonrpc": "2.0",
+                    "id": data.get("id"),
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": str(result)
+                            }
+                        ]
+                    }
+                })
             else:
-                return JSONResponse(content={"error": "No tool specified"}, status_code=400)
+                return JSONResponse(content={
+                    "jsonrpc": "2.0",
+                    "id": data.get("id"),
+                    "error": {
+                        "code": -32601,
+                        "message": f"Tool '{tool_name}' not found"
+                    }
+                })
+        
         else:
-            return JSONResponse(content={"error": "No data provided"}, status_code=400)
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "error": {
+                    "code": -32601,
+                    "message": f"Method '{data.get('method')}' not found"
+                }
+            })
             
     except Exception as e:
         logger.error(f"❌ SSE POST error: {e}")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse(content={
+            "jsonrpc": "2.0",
+            "id": data.get("id") if 'data' in locals() else None,
+            "error": {
+                "code": -32603,
+                "message": str(e)
+            }
+        }, status_code=500)
+
 
 if __name__ == "__main__":
     logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server...")

@@ -736,10 +736,11 @@ def handle_extract_access_code(args: Dict[str, Any]) -> Dict[str, Any]:
         
         # Common patterns for DocuSign access codes
         patterns = [
-            r'access code[:\s]+([A-Z0-9]{6,8})',  # "access code: ABC123"
-            r'security code[:\s]+([A-Z0-9]{6,8})',  # "security code: ABC123"
-            r'code[:\s]+([A-Z0-9]{6,8})',  # "code: ABC123"
-            r'([A-Z0-9]{6,8})',  # Just 6-8 alphanumeric characters
+            r'access code[:\s]+([A-Z0-9]{4,8})',  # "access code: ABC123"
+            r'security code[:\s]+([A-Z0-9]{4,8})',  # "security code: ABC123"
+            r'code[:\s]+([A-Z0-9]{4,8})',  # "code: ABC123"
+            r'Your.*?code[:\s]+([A-Z0-9]{4,8})',  # "Your access code is: ABC123"
+            r'([A-Z0-9]{4,8})',  # Just 4-8 alphanumeric characters (fallback)
         ]
         
         access_codes = []
@@ -749,7 +750,11 @@ def handle_extract_access_code(args: Dict[str, Any]) -> Dict[str, Any]:
         
         # Remove duplicates and filter out common false positives
         unique_codes = list(set(access_codes))
-        filtered_codes = [code for code in unique_codes if len(code) >= 4 and code.isalnum()]
+        # Filter out common false positives and ensure proper length
+        filtered_codes = [code for code in unique_codes 
+                         if len(code) >= 4 and len(code) <= 8 
+                         and code.isalnum() 
+                         and code.upper() not in ['ACCESS', 'CODE', 'DOCUSIGN', 'PLEASE', 'DOCUMENT', 'SIGNING']]
         
         if filtered_codes:
             # Return the first (most likely) access code

@@ -845,27 +845,27 @@ async def mcp_endpoint(request: Request):
                         },
                         {
                             "name": "fill_envelope",
-                            "description": "Fill PDF form fields",
+                            "description": "Fill form fields in existing DocuSign envelope",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
-                                    "form_data": {"type": "object", "description": "Form field data"}
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill"}
                                 },
-                                "required": ["pdf_url", "form_data"]
+                                "required": ["envelope_id", "field_data"]
                             }
                         },
                         {
                             "name": "sign_envelope",
-                            "description": "Send document for signature",
+                            "description": "Sign existing DocuSign envelope",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
-                                    "signer_email": {"type": "string", "description": "Signer email address"},
-                                    "signer_name": {"type": "string", "description": "Signer name"}
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "security_code": {"type": "string", "description": "Security code for signing (optional)"}
                                 },
-                                "required": ["pdf_url", "signer_email", "signer_name"]
+                                "required": ["envelope_id", "recipient_email"]
                             }
                         },
                         {
@@ -1033,27 +1033,27 @@ async def sse_endpoint(request: Request):
                         },
                         {
                             "name": "fill_envelope",
-                            "description": "Fill PDF form fields",
+                            "description": "Fill form fields in existing DocuSign envelope",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
-                                    "form_data": {"type": "object", "description": "Form field data"}
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill"}
                                 },
-                                "required": ["pdf_url", "form_data"]
+                                "required": ["envelope_id", "field_data"]
                             }
                         },
                         {
                             "name": "sign_envelope",
-                            "description": "Send document for signature",
+                            "description": "Sign existing DocuSign envelope",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
-                                    "signer_email": {"type": "string", "description": "Signer email address"},
-                                    "signer_name": {"type": "string", "description": "Signer name"}
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "security_code": {"type": "string", "description": "Security code for signing (optional)"}
                                 },
-                                "required": ["pdf_url", "signer_email", "signer_name"]
+                                "required": ["envelope_id", "recipient_email"]
                             }
                         },
                         {

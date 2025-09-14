@@ -46,6 +46,8 @@ class MockSettings:
         return False
     ENVIRONMENT = "production"
 
+if not USE_REAL_APIS:
+    settings = MockSettings()
     logger.warning("⚠️  Using mock implementations for missing modules")
 
 
@@ -53,41 +55,7 @@ class MockSettings:
 TOOL_HANDLERS = {}
 app = FastAPI()
 
-def create_test_pdf():
-    """Create a simple test PDF for production"""
-    try:
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import letter
-        
-        c = canvas.Canvas('test.pdf', pagesize=letter)
-        c.drawString(100, 750, 'Test Document for DocuSign')
-        c.drawString(100, 700, 'This is a test document to verify DocuSign integration.')
-        c.drawString(100, 650, 'Please sign this document to test the e-signature functionality.')
-        c.save()
-        logger.info("✅ Test PDF created successfully")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Failed to create test PDF: {e}")
-        return False
-
-def download_file_from_url(url):
-    """Download a file from URL and save it locally"""
-    try:
-        logger.info(f"📥 Downloading file from URL: {url}")
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        
-        # Save to temporary file
-        filename = f"temp_{int(time.time())}.pdf"
-        with open(filename, 'wb') as f:
-            f.write(response.content)
-        
-        logger.info(f"✅ File downloaded successfully: {filename}")
-        return filename
-    except Exception as e:
-        logger.error(f"❌ Failed to download file: {e}")
-        return None
-
+# Define handler functions first
 def handle_send_for_signature(args):
     """Handle send_for_signature tool call with proper file handling."""
     logger.info(f"📧 send_for_signature called with args: {args}")
@@ -169,84 +137,6 @@ def handle_get_server_info(args):
     except Exception as e:
         logger.error(f"❌ get_server_info error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to get server info"}
-
-
-@app.get("/")
-async def root():
-    return {"message": "Doc Filling + E-Signing MCP Server", "status": "running"}
-
-@app.get("/sse")
-async def sse_endpoint(request: Request, tool: str = None, args: str = None):
-    """SSE endpoint for MCP tool support."""
-    logger.info(f"📡 SSE GET request - tool: {tool}, args: {args}")
-    
-    if tool:
-        try:
-            tool_args = {}
-            if args:
-                try:
-                    tool_args = json.loads(args)
-                except json.JSONDecodeError:
-                    logger.error(f"❌ Invalid JSON in args: {args}")
-                    tool_args = {}
-            
-            logger.info(f"🔧 Executing tool: {tool} with args: {tool_args}")
-            
-            if tool in TOOL_HANDLERS:
-                result = TOOL_HANDLERS[tool](tool_args)
-                logger.info(f"✅ Tool result: {result}")
-                return JSONResponse(content=result)
-            else:
-                logger.error(f"❌ Tool not found: {tool}")
-                return JSONResponse(content={"error": f"Tool '{tool}' not found"}, status_code=404)
-                
-        except Exception as e:
-            logger.error(f"❌ Tool execution error: {e}")
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-    
-    return JSONResponse(content={
-        "message": "Doc Filling + E-Signing MCP Server",
-        "status": "running",
-        "available_tools": list(TOOL_HANDLERS.keys())
-    })
-
-@app.post("/sse")
-async def sse_post_endpoint(request: Request):
-    """POST endpoint for SSE with MCP tool support."""
-    try:
-        body = await request.body()
-        if body:
-            data = json.loads(body.decode())
-            logger.info(f"📨 SSE POST request: {data}")
-            
-            tool = data.get("tool")
-            args = data.get("args", {})
-            
-            if tool:
-                logger.info(f"🔧 Executing tool: {tool} with args: {args}")
-                logger.info(f"🔍 Available tools in TOOL_HANDLERS: {list(TOOL_HANDLERS.keys())}")                
-                if tool in TOOL_HANDLERS:
-                    result = TOOL_HANDLERS[tool](args)
-                    logger.info(f"✅ Tool result: {result}")
-                    return JSONResponse(content=result)
-                else:
-                    logger.error(f"❌ Tool not found: {tool}")
-                    return JSONResponse(content={"error": f"Tool '{tool}' not found"}, status_code=404)
-            else:
-                return JSONResponse(content={"error": "No tool specified"}, status_code=400)
-        else:
-            return JSONResponse(content={"error": "No data provided"}, status_code=400)
-            
-    except Exception as e:
-        logger.error(f"❌ SSE POST error: {e}")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
-
-if __name__ == "__main__":
-    logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server...")
-    logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
-    logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
-    
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 def handle_fill_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle filling a DocuSign envelope with data."""
@@ -400,7 +290,6 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
                         "sent_date": result.get("sent_date"),
                         "completed_date": result.get("completed_date"),
                         "recipients": result.get("recipients", []),
-
                     }
                 else:
                     error_msg = result.get("error", "Unknown error")
@@ -419,8 +308,6 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"❌ get_envelope_status error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to get envelope status"}
 
-# Tool dispatcher
-
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
     "fill_envelope": handle_fill_envelope,
@@ -430,4 +317,115 @@ TOOL_HANDLERS.update({
     "send_for_signature": handle_send_for_signature,
     "get_server_info": handle_get_server_info
 })
-# Force deployment - Sun Sep 14 02:15:34 PDT 2025
+
+def create_test_pdf():
+    """Create a simple test PDF for production"""
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+        
+        c = canvas.Canvas('test.pdf', pagesize=letter)
+        c.drawString(100, 750, 'Test Document for DocuSign')
+        c.drawString(100, 700, 'This is a test document to verify DocuSign integration.')
+        c.drawString(100, 650, 'Please sign this document to test the e-signature functionality.')
+        c.save()
+        logger.info("✅ Test PDF created successfully")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to create test PDF: {e}")
+        return False
+
+def download_file_from_url(url):
+    """Download a file from URL and save it locally"""
+    try:
+        logger.info(f"📥 Downloading file from URL: {url}")
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        
+        # Save to temporary file
+        filename = f"temp_{int(time.time())}.pdf"
+        with open(filename, 'wb') as f:
+            f.write(response.content)
+        
+        logger.info(f"✅ File downloaded successfully: {filename}")
+        return filename
+    except Exception as e:
+        logger.error(f"❌ Failed to download file: {e}")
+        return None
+
+@app.get("/")
+async def root():
+    return {"message": "Doc Filling + E-Signing MCP Server", "status": "running"}
+
+@app.get("/sse")
+async def sse_endpoint(request: Request, tool: str = None, args: str = None):
+    """SSE endpoint for MCP tool support."""
+    logger.info(f"📡 SSE GET request - tool: {tool}, args: {args}")
+    
+    if tool:
+        try:
+            tool_args = {}
+            if args:
+                try:
+                    tool_args = json.loads(args)
+                except json.JSONDecodeError:
+                    logger.error(f"❌ Invalid JSON in args: {args}")
+                    tool_args = {}
+            
+            logger.info(f"🔧 Executing tool: {tool} with args: {tool_args}")
+            
+            if tool in TOOL_HANDLERS:
+                result = TOOL_HANDLERS[tool](tool_args)
+                logger.info(f"✅ Tool result: {result}")
+                return JSONResponse(content=result)
+            else:
+                logger.error(f"❌ Tool not found: {tool}")
+                return JSONResponse(content={"error": f"Tool '{tool}' not found"}, status_code=404)
+                
+        except Exception as e:
+            logger.error(f"❌ Tool execution error: {e}")
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+    
+    return JSONResponse(content={
+        "message": "Doc Filling + E-Signing MCP Server",
+        "status": "running",
+        "available_tools": list(TOOL_HANDLERS.keys())
+    })
+
+@app.post("/sse")
+async def sse_post_endpoint(request: Request):
+    """POST endpoint for SSE with MCP tool support."""
+    try:
+        body = await request.body()
+        if body:
+            data = json.loads(body.decode())
+            logger.info(f"📨 SSE POST request: {data}")
+            
+            tool = data.get("tool")
+            args = data.get("args", {})
+            
+            if tool:
+                logger.info(f"🔧 Executing tool: {tool} with args: {args}")
+                logger.info(f"🔍 Available tools in TOOL_HANDLERS: {list(TOOL_HANDLERS.keys())}")                
+                if tool in TOOL_HANDLERS:
+                    result = TOOL_HANDLERS[tool](args)
+                    logger.info(f"✅ Tool result: {result}")
+                    return JSONResponse(content=result)
+                else:
+                    logger.error(f"❌ Tool not found: {tool}")
+                    return JSONResponse(content={"error": f"Tool '{tool}' not found"}, status_code=404)
+            else:
+                return JSONResponse(content={"error": "No tool specified"}, status_code=400)
+        else:
+            return JSONResponse(content={"error": "No data provided"}, status_code=400)
+            
+    except Exception as e:
+        logger.error(f"❌ SSE POST error: {e}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+if __name__ == "__main__":
+    logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server...")
+    logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
+    logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
+    
+    uvicorn.run(app, host="0.0.0.0", port=8000)

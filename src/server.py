@@ -1438,6 +1438,8 @@ async def sse_endpoint(request: Request):
         logger.info(f"📡 SSE POST request from {request.client.host}")
         logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
         logger.info(f"🔍 DEBUG: Body: {data}")
+        logger.info(f"🔍 DEBUG: Raw body: {body}")
+        logger.info(f"🔍 DEBUG: Request URL: {request.url}")
         
         # Handle MCP protocol messages
         if data.get("method") == "initialize":

@@ -308,54 +308,9 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"❌ get_envelope_status error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to get envelope status"}
 
-def handle_getenvelope(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle getting DocuSign envelope details (alias for get_envelope_status)."""
-    try:
-        envelope_id = args.get("envelope_id")
-        
-        if not envelope_id:
-            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
-        
-        logger.info(f"📋 getenvelope called with envelope_id: {envelope_id}")
-        
-        if USE_REAL_APIS:
-            logger.info("🔗 Using REAL DocuSign API")
-            try:
-                result = get_envelope_status_docusign(envelope_id)
-                
-                logger.info(f"📋 DocuSign result: {result}")
-                
-                if result.get("success"):
-                    return {
-                        "success": True, 
-                        "envelope_id": result["envelope_id"], 
-                        "status": result["status"],
-                        "created_date": result.get("created_date"),
-                        "sent_date": result.get("sent_date"),
-                        "completed_date": result.get("completed_date"),
-                        "recipients": result.get("recipients", []),
-                        "message": "Envelope retrieved successfully"
-                    }
-                else:
-                    error_msg = result.get("error", "Unknown error")
-                    logger.error(f"❌ DocuSign API error: {error_msg}")
-                    return {"success": False, "error": error_msg, "message": "Failed to get envelope"}
-                    
-            except Exception as e:
-                logger.error(f"❌ DocuSign API exception: {e}")
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
-                return {"success": False, "error": str(e), "message": "Failed to get envelope"}
-        else:
-            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
-            
-    except Exception as e:
-        logger.error(f"❌ getenvelope error: {e}")
-        return {"success": False, "error": str(e), "message": "Failed to get envelope"}
-
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
-    "getenvelope": handle_getenvelope,
+    "getenvelope": handle_get_envelope_status,
     "fill_envelope": handle_fill_envelope,
     "sign_envelope": handle_sign_envelope,
     "submit_envelope": handle_submit_envelope,

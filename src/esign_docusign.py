@@ -535,3 +535,69 @@ def get_envelope_status_docusign(envelope_id: str) -> Dict[str, Any]:
             "error": str(e),
             "message": "Failed to get envelope status"
         }
+
+def create_recipient_view_with_code(envelope_id: str, recipient_email: str, access_code: str, return_url: str = "https://www.docusign.com") -> Dict[str, Any]:
+    """
+    Create a recipient view URL using access code for document access.
+    
+    Args:
+        envelope_id: DocuSign envelope ID
+        recipient_email: Recipient email address
+        access_code: Access code from email
+        return_url: URL to redirect after signing
+        
+    Returns:
+        Dict with success status and signing URL
+    """
+    try:
+        if not settings.validate_docusign_config():
+            return {"success": False, "error": "DocuSign not configured", "message": "DocuSign configuration is missing or invalid"}
+        
+        # Get JWT token
+        token = get_docusign_jwt_token()
+        if not token:
+            return {"success": False, "error": "Authentication failed", "message": "Could not authenticate with DocuSign"}
+        
+        # Create recipient view request
+        recipient_view_request = {
+            "authenticationMethod": "email",
+            "email": recipient_email,
+            "userName": recipient_email,
+            "returnUrl": return_url,
+            "accessCode": access_code
+        }
+        
+        # Make API call to create recipient view
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        
+        url = f"{settings.DOCUSIGN_BASE_PATH}/restapi/v2.1/accounts/{settings.DOCUSIGN_ACCOUNT_ID}/envelopes/{envelope_id}/views/recipient"
+        
+        response = requests.post(url, headers=headers, json=recipient_view_request)
+        
+        if response.status_code == 201:
+            data = response.json()
+            return {
+                "success": True,
+                "signing_url": data.get("url"),
+                "envelope_id": envelope_id,
+                "recipient_email": recipient_email,
+                "message": "Recipient view URL created successfully"
+            }
+        else:
+            error_data = response.json() if response.content else {}
+            error_msg = error_data.get("message", f"HTTP {response.status_code}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "message": f"Failed to create recipient view: {error_msg}"
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Exception creating recipient view: {str(e)}"
+        }

@@ -722,6 +722,112 @@ def handle_create_demo_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
         return {"success": False, "error": str(e), "message": "Failed to create demo envelope"}
 
+def handle_extract_access_code(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle extracting access code from email content."""
+    try:
+        email_content = args.get("email_content", "")
+        
+        if not email_content:
+            return {"success": False, "error": "email_content is required", "message": "Please provide email_content"}
+        
+        logger.info(f"🔍 extract_access_code called with email_content length: {len(email_content)}")
+        
+        import re
+        
+        # Common patterns for DocuSign access codes
+        patterns = [
+            r'access code[:\s]+([A-Z0-9]{6,8})',  # "access code: ABC123"
+            r'security code[:\s]+([A-Z0-9]{6,8})',  # "security code: ABC123"
+            r'code[:\s]+([A-Z0-9]{6,8})',  # "code: ABC123"
+            r'([A-Z0-9]{6,8})',  # Just 6-8 alphanumeric characters
+        ]
+        
+        access_codes = []
+        for pattern in patterns:
+            matches = re.findall(pattern, email_content, re.IGNORECASE)
+            access_codes.extend(matches)
+        
+        # Remove duplicates and filter out common false positives
+        unique_codes = list(set(access_codes))
+        filtered_codes = [code for code in unique_codes if len(code) >= 4 and code.isalnum()]
+        
+        if filtered_codes:
+            # Return the first (most likely) access code
+            access_code = filtered_codes[0]
+            logger.info(f"✅ Found access code: {access_code}")
+            return {
+                "success": True,
+                "access_code": access_code,
+                "all_codes": filtered_codes,
+                "message": f"Extracted access code: {access_code}"
+            }
+        else:
+            logger.warning("⚠️ No access code found in email content")
+            return {
+                "success": False,
+                "error": "No access code found",
+                "message": "Could not find access code in email content. Please check the email format.",
+                "suggestions": [
+                    "Look for text like 'Your access code is: ABC123'",
+                    "Check for 'Security code: ABC123'",
+                    "Ensure the email contains a 4-8 character alphanumeric code"
+                ]
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ extract_access_code error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to extract access code"}
+
+def handle_create_recipient_view_with_code(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle creating recipient view URL using access code."""
+    try:
+        envelope_id = args.get("envelope_id")
+        recipient_email = args.get("recipient_email")
+        access_code = args.get("access_code")
+        return_url = args.get("return_url", "https://www.docusign.com")
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
+        if not recipient_email:
+            return {"success": False, "error": "recipient_email is required", "message": "Please provide recipient_email"}
+        if not access_code:
+            return {"success": False, "error": "access_code is required", "message": "Please provide access_code"}
+        
+        logger.info(f"🔗 create_recipient_view_with_code called with envelope_id: {envelope_id}, recipient_email: {recipient_email}")
+        
+        if USE_REAL_APIS:
+            logger.info("🔗 Using REAL DocuSign API")
+            try:
+                from esign_docusign import create_recipient_view_with_code
+                result = create_recipient_view_with_code(envelope_id, recipient_email, access_code, return_url)
+                
+                logger.info(f"🔗 DocuSign result: {result}")
+                
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "signing_url": result["signing_url"],
+                        "envelope_id": result["envelope_id"],
+                        "recipient_email": recipient_email,
+                        "message": "Recipient view URL created successfully"
+                    }
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.error(f"❌ DocuSign API error: {error_msg}")
+                    return {"success": False, "error": error_msg, "message": "Failed to create recipient view"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to create recipient view"}
+        else:
+            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+            
+    except Exception as e:
+        logger.error(f"❌ create_recipient_view_with_code error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to create recipient view"}
+
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
     "getenvelope": handle_getenvelope,
@@ -735,7 +841,9 @@ TOOL_HANDLERS.update({
     "create_embedded_signing": handle_create_embedded_signing,
     "open_document_for_signing": handle_open_document_for_signing,
     "fill_document_fields": handle_fill_document_fields,
-    "create_demo_envelope": handle_create_demo_envelope
+    "create_demo_envelope": handle_create_demo_envelope,
+    "extract_access_code": handle_extract_access_code,
+    "create_recipient_view_with_code": handle_create_recipient_view_with_code
 })
 
 def create_test_pdf():
@@ -930,6 +1038,31 @@ async def mcp_endpoint(request: Request):
                                 },
                                 "required": ["pdf_url"]
                             }
+                        },
+                        {
+                            "name": "extract_access_code",
+                            "description": "Extract access code from DocuSign email content",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "email_content": {"type": "string", "description": "Full email content to search for access code"}
+                                },
+                                "required": ["email_content"]
+                            }
+                        },
+                        {
+                            "name": "create_recipient_view_with_code",
+                            "description": "Create recipient view URL using access code for document access",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "access_code": {"type": "string", "description": "Access code from email"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["envelope_id", "recipient_email", "access_code"]
+                            }
                         }
                     ]
                 }
@@ -1117,6 +1250,31 @@ async def sse_endpoint(request: Request):
                                     "message": {"type": "string", "description": "Email message (optional)"}
                                 },
                                 "required": ["pdf_url"]
+                            }
+                        },
+                        {
+                            "name": "extract_access_code",
+                            "description": "Extract access code from DocuSign email content",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "email_content": {"type": "string", "description": "Full email content to search for access code"}
+                                },
+                                "required": ["email_content"]
+                            }
+                        },
+                        {
+                            "name": "create_recipient_view_with_code",
+                            "description": "Create recipient view URL using access code for document access",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "access_code": {"type": "string", "description": "Access code from email"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["envelope_id", "recipient_email", "access_code"]
                             }
                         }
                     ]

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Doc Filling + E-Signing MCP Server - Production Ready with SSE + MCP
-Handles both SSE and MCP functionality for Poke integration
+Doc Filling + E-Signing MCP Server - Production Ready with Logging
 """
 import json
 import sys
@@ -18,10 +17,9 @@ sys.path.insert(0, str(current_dir))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI, Request, Query
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 import uvicorn
-import asyncio
 
 # Import real implementations with proper error handling
 try:
@@ -183,7 +181,7 @@ def handle_fill_pdf_fields(args):
 
 def handle_send_for_signature(args):
     """Handle send_for_signature tool call."""
-    logger.info(f"�� send_for_signature called with args: {args}")
+    logger.info(f"📧 send_for_signature called with args: {args}")
     try:
         file_url = args.get("file_url", "")
         recipient_email = args.get("recipient_email", "")
@@ -320,7 +318,7 @@ async def mcp_endpoint(request: Request):
                 if body:
                     # Parse the MCP request
                     mcp_request = json.loads(body.decode())
-                    logger.info(f"📨 MCP request: {mcp_request}")
+                    logger.info(f"�� MCP request: {mcp_request}")
                     
                     # Process MCP request and send response
                     if mcp_request.get("method") == "initialize":
@@ -410,83 +408,17 @@ async def mcp_endpoint(request: Request):
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.get("/sse")
-async def sse_endpoint(request: Request, tool: str = None, args: str = None):
-    """
-    Server-Sent Events endpoint for real-time updates with MCP tool support.
-    Poke can call this endpoint with tool parameters to execute MCP functions.
-    """
-    logger.info(f"📡 SSE request received - tool: {tool}, args: {args}")
+async def sse_endpoint():
+    """Server-Sent Events endpoint for real-time updates."""
+    from fastapi.responses import StreamingResponse
+    import asyncio
     
-    # If tool is specified, execute the MCP tool
-    if tool:
-        try:
-            # Parse arguments if provided
-            tool_args = {}
-            if args:
-                try:
-                    tool_args = json.loads(args)
-                except json.JSONDecodeError:
-                    logger.error(f"❌ Invalid JSON in args: {args}")
-                    tool_args = {}
-            
-            logger.info(f"🔧 Executing tool: {tool} with args: {tool_args}")
-            
-            if tool in TOOL_HANDLERS:
-                result = TOOL_HANDLERS[tool](tool_args)
-                logger.info(f"✅ Tool result: {result}")
-                
-                # Return the result as JSON instead of streaming
-                return JSONResponse(content=result)
-            else:
-                logger.error(f"❌ Tool not found: {tool}")
-                return JSONResponse(content={"error": f"Tool '{tool}' not found"}, status_code=404)
-                
-        except Exception as e:
-            logger.error(f"❌ Tool execution error: {e}")
-            return JSONResponse(content={"error": str(e)}, status_code=500)
+    async def event_generator():
+        while True:
+            yield f"data: {json.dumps({'message': 'Server is running', 'timestamp': time.time()})}\n\n"
+            await asyncio.sleep(30)
     
-    # If no tool specified, return available tools
-    logger.info("📋 Returning available tools")
-    return JSONResponse(content={
-        "message": "Doc Filling + E-Signing MCP Server",
-        "status": "running",
-        "available_tools": [tool["name"] for tool in MCP_TOOLS],
-        "usage": "Add ?tool=<tool_name>&args=<json_args> to execute a tool"
-    })
-
-@app.post("/sse")
-async def sse_post_endpoint(request: Request):
-    """
-    POST endpoint for SSE with MCP tool support.
-    Poke can POST to this endpoint with tool data.
-    """
-    try:
-        body = await request.body()
-        if body:
-            data = json.loads(body.decode())
-            logger.info(f"📨 SSE POST request: {data}")
-            
-            tool = data.get("tool")
-            args = data.get("args", {})
-            
-            if tool:
-                logger.info(f"🔧 Executing tool: {tool} with args: {args}")
-                
-                if tool in TOOL_HANDLERS:
-                    result = TOOL_HANDLERS[tool](args)
-                    logger.info(f"✅ Tool result: {result}")
-                    return JSONResponse(content=result)
-                else:
-                    logger.error(f"❌ Tool not found: {tool}")
-                    return JSONResponse(content={"error": f"Tool '{tool}' not found"}, status_code=404)
-            else:
-                return JSONResponse(content={"error": "No tool specified"}, status_code=400)
-        else:
-            return JSONResponse(content={"error": "No data provided"}, status_code=400)
-            
-    except Exception as e:
-        logger.error(f"❌ SSE POST error: {e}")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+    return StreamingResponse(event_generator(), media_type="text/plain")
 
 if __name__ == "__main__":
     logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server...")

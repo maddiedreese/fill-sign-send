@@ -7,7 +7,7 @@ import requests
 import base64
 from typing import Dict, Any, Optional
 from docusign_esign import ApiClient, AuthenticationApi, EnvelopesApi
-from docusign_esign.models import EnvelopeDefinition, Document, Signer, SignHere, Tabs, Recipients
+from docusign_esign.models import EnvelopeDefinition, Document, Signer, SignHere, Tabs, Recipients, Text
 from settings import settings
 from private_key_loader import load_private_key_from_env
 import logging

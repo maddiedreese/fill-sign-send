@@ -430,3 +430,4 @@ TOOL_HANDLERS.update({
     "send_for_signature": handle_send_for_signature,
     "get_server_info": handle_get_server_info
 })
+# Force deployment - Sun Sep 14 02:15:34 PDT 2025

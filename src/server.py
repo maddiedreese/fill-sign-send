@@ -527,5 +527,5 @@ async def health():
 @app.post("/sse")
 async def sse_endpoint(request: Request):
     """SSE endpoint for Poke MCP compatibility."""
-    from sse_handler import handle_mcp_sse
+    from src.sse_handler import handle_mcp_sse
     return await handle_mcp_sse(request)

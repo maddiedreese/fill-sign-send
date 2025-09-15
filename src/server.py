@@ -121,7 +121,7 @@ def handle_get_server_info(args):
             docusign_valid = False
             poke_valid = False
         
-        return {
+    return {
             "success": True,
             "server": {"name": "Doc Filling + E-Signing MCP Server", "version": "1.0.0", "status": "running"},
             "config": {
@@ -138,8 +138,7 @@ def handle_get_server_info(args):
 def handle_fill_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle filling a DocuSign envelope with data."""
     try:
-        # Handle both parameter formats: Poke uses pdf_url, we expect envelope_id
-        envelope_id = args.get("envelope_id") or args.get("pdf_url")
+        envelope_id = args.get("envelope_id")
         field_data = args.get("field_data", {})
         
         if not envelope_id:
@@ -180,9 +179,8 @@ def handle_fill_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
 def handle_sign_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle signing a DocuSign envelope."""
     try:
-        # Handle both parameter formats: Poke uses pdf_url/signer_email, we expect envelope_id/recipient_email
-        envelope_id = args.get("envelope_id") or args.get("pdf_url")
-        recipient_email = args.get("recipient_email") or args.get("signer_email")
+        envelope_id = args.get("envelope_id")
+        recipient_email = args.get("recipient_email")
         security_code = args.get("security_code")
         
         if not envelope_id:
@@ -228,9 +226,8 @@ def handle_sign_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
 def handle_submit_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle submitting a DocuSign envelope."""
     try:
-        # Handle both parameter formats: Poke uses pdf_url, we expect envelope_id
-        envelope_id = args.get("envelope_id") or args.get("pdf_url")
-                
+        envelope_id = args.get("envelope_id")
+        
         if not envelope_id:
             return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
         
@@ -258,54 +255,10 @@ def handle_submit_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
                 return {"success": False, "error": str(e), "message": "Failed to submit envelope"}
         else:
             return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
-
             
     except Exception as e:
         logger.error(f"❌ submit_envelope error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to submit envelope"}
-def handle_complete_signing(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle completing document signing."""
-    try:
-        # Handle both parameter formats: Poke uses pdf_url/signer_email, we expect envelope_id/recipient_email
-        envelope_id = args.get("envelope_id") or args.get("pdf_url")
-        recipient_email = args.get("recipient_email") or args.get("signer_email")
-        signature_data = args.get("signature_data")
-        
-        if not envelope_id:
-            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
-        
-        if not recipient_email:
-            return {"success": False, "error": "recipient_email is required", "message": "Please provide recipient_email"}
-        
-        logger.info(f"✍️ complete_signing called with envelope_id: {envelope_id}, recipient_email: {recipient_email}")
-        
-        if USE_REAL_APIS:
-            logger.info("🔗 Using REAL DocuSign API")
-            try:
-                from esign_docusign import complete_document_signing
-                result = complete_document_signing(envelope_id, recipient_email, signature_data)
-                
-                logger.info(f"✍️ DocuSign result: {result}")
-                
-                if result.get("success"):
-                    return {"success": True, "envelope_id": result["envelope_id"], "status": result["status"], "message": result["message"]}
-                else:
-                    error_msg = result.get("error", "Unknown error")
-                    logger.error(f"❌ DocuSign API error: {error_msg}")
-                    return {"success": False, "error": error_msg, "message": "Failed to complete signing"}
-                    
-            except Exception as e:
-                logger.error(f"❌ DocuSign API exception: {e}")
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
-                return {"success": False, "error": str(e), "message": "Failed to complete signing"}
-        else:
-            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
-
-            
-    except Exception as e:
-        logger.error(f"❌ complete_signing error: {e}")
-        return {"success": False, "error": str(e), "message": "Failed to complete signing"}
 
 def handle_getenvelope(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle getting DocuSign envelope from link or security code."""
@@ -318,10 +271,10 @@ def handle_getenvelope(args: Dict[str, Any]) -> Dict[str, Any]:
         
         # If we have a link, extract envelope ID from it
         if link and not envelope_id:
-            if "docusign.net" in link:
+            if "docusign.net/signing/documents/" in link:
                 # Extract envelope ID from DocuSign signing link
                 import re
-                match = re.search(r"/documents/([a-f0-9-]+)", link)
+                match = re.search(r"/signing/documents/([a-f0-9-]+)", link)
                 if match:
                     envelope_id = match.group(1)
                     logger.info(f"📋 Extracted envelope_id from link: {envelope_id}")
@@ -1019,6 +972,7 @@ def handle_access_document_with_code(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e), "message": "Failed to access document with access code"}
 
 def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle complete DocuSign workflow: extract from email, access document, fill, sign, and send."""
     try:
         email_content = args.get("email_content", "")
         recipient_email = args.get("recipient_email", "")
@@ -1029,6 +983,9 @@ def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
             return {"success": False, "error": "email_content is required", "message": "Please provide email_content"}
         
         logger.info(f"🔄 complete_docusign_workflow called with email_content length: {len(email_content)}")
+        
+        # Step 1: Extract envelope ID and access code from email
+        logger.info("🔍 Step 1: Extracting envelope ID and access code from email...")
         extraction_result = handle_extract_envelope_and_access_code({"email_content": email_content})
         
         if not extraction_result.get("success"):
@@ -1131,8 +1088,12 @@ def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
                 "Check envelope status for completion"
             ]
         }
+        
     except Exception as e:
         logger.error(f"❌ complete_docusign_workflow error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {"success": False, "error": str(e), "message": "Failed to complete DocuSign workflow"}
 
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
@@ -1152,8 +1113,7 @@ TOOL_HANDLERS.update({
     "extract_envelope_and_access_code": handle_extract_envelope_and_access_code,
     "create_recipient_view_with_code": handle_create_recipient_view_with_code,
     "access_document_with_code": handle_access_document_with_code,
-    "complete_docusign_workflow": handle_complete_docusign_workflow,
-    "complete_signing": handle_complete_signing
+    "complete_docusign_workflow": handle_complete_docusign_workflow
 })
 
 def create_test_pdf():
@@ -1203,6 +1163,7 @@ async def debug_endpoint(request: Request):
     logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
     logger.info(f"🔍 DEBUG: Query params: {dict(request.query_params)}")
     return {"message": "Debug endpoint", "client_ip": str(request.client.host), "headers": dict(request.headers)}
+
 @app.post("/debug")
 async def debug_post_endpoint(request: Request):
     """Debug endpoint to log all POST requests from Poke."""
@@ -1213,25 +1174,6 @@ async def debug_post_endpoint(request: Request):
     return {"message": "Debug POST endpoint", "client_ip": str(request.client.host), "body": body.decode() if body else "No body"}
     return {"message": "Doc Filling + E-Signing MCP Server", "status": "running"}
 
-@app.get("/mcp")
-async def mcp_get_endpoint(request: Request):
-    """MCP GET endpoint for initialization."""
-    return JSONResponse(content={
-        "jsonrpc": "2.0",
-        "id": None,
-        "result": {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {
-                "tools": {
-                    "listChanged": True
-                }
-            },
-            "serverInfo": {
-                "name": "fill-sign-send-mcp-server",
-                "version": "1.0.0"
-            }
-        }
-    })
 @app.post("/mcp")
 async def mcp_endpoint(request: Request):
     """MCP protocol endpoint for tool calls."""
@@ -1248,23 +1190,36 @@ async def mcp_endpoint(request: Request):
                     "code": -32700,
                     "message": "Parse error: Invalid JSON"
                 }
-            }, status_code=200)
+            }, status_code=400)
         
         logger.info(f"📡 MCP POST request from {request.client.host}")
         logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
         logger.info(f"🔍 DEBUG: Body: {data}")
         logger.info(f"🔍 DEBUG: Raw body: {body}")
         logger.info(f"🔍 DEBUG: Request URL: {request.url}")
-        logger.info(f"🔍 DEBUG: Method: {request.method}")
-        content_type = request.headers.get("content-type", "Not set")
-        user_agent = request.headers.get("user-agent", "Not set")
-        logger.info(f"🔍 DEBUG: Content-Type: {content_type}")
-        # Handle MCP protocol messages - be lenient with request format
-        # If no method specified, default to tools/list
-        if not data.get("method"):
-            data["method"] = "tools/list"
-            logger.info("🔧 Defaulting to tools/list for request without method")
         
+        # Validate required MCP fields
+        if not data.get("jsonrpc"):
+            logger.error(f"❌ Missing jsonrpc field in MCP request")
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request: Missing jsonrpc field"
+                }
+            }, status_code=400)
+        
+        if not data.get("method"):
+            logger.error(f"❌ Missing method field in MCP request")
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request: Missing method field"
+                }
+            }, status_code=400)
         
         # Handle MCP protocol messages
         if data.get("method") == "initialize":
@@ -1442,7 +1397,7 @@ async def mcp_endpoint(request: Request):
                         },
                         {
                             "name": "complete_docusign_workflow",
-                                "type": "object",
+                            "description": "Complete DocuSign workflow: extract envelope ID and access code from email, then fill, sign, and send document",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -1497,29 +1452,7 @@ async def mcp_endpoint(request: Request):
             })
             
     except Exception as e:
-        # Catch-all for any unknown methods
-        # Catch-all for any unknown methods
-        method = data.get("method")
-        logger.warning(f"⚠️  Unknown MCP method: {method} - defaulting to tools/list")
-        return JSONResponse(content={
-            "jsonrpc": "2.0",
-            "id": data.get("id"),
-            "result": {
-                "tools": [
-                    {"name": "getenvelope"},
-                    {"name": "fill_envelope"},
-                    {"name": "sign_envelope"},
-                    {"name": "submit_envelope"},
-                    {"name": "get_envelope_status"},
-                    {"name": "send_for_signature"},
-                    {"name": "get_server_info"},
-                    {"name": "debug_docusign_config"}
-                ]
-            }
-        })
         logger.error(f"❌ MCP POST error: {e}")
-        import traceback
-        logger.error(f"❌ MCP Traceback: {traceback.format_exc()}")
         return JSONResponse(content={
             "jsonrpc": "2.0",
             "id": data.get("id") if 'data' in locals() else None,
@@ -1527,7 +1460,7 @@ async def mcp_endpoint(request: Request):
                 "code": -32603,
                 "message": str(e)
             }
-        }, status_code=200)
+        }, status_code=500)
 
 @app.post("/sse")
 async def sse_endpoint(request: Request):
@@ -1541,9 +1474,7 @@ async def sse_endpoint(request: Request):
         logger.info(f"🔍 DEBUG: Body: {data}")
         logger.info(f"🔍 DEBUG: Raw body: {body}")
         logger.info(f"🔍 DEBUG: Request URL: {request.url}")
-        logger.info(f"🔍 DEBUG: Method: {request.method}")
-        logger.info("🔍 DEBUG: Content-Type: " + str(request.headers.get("content-type", "Not set")))
-        logger.info("🔍 DEBUG: User-Agent: " + str(request.headers.get("user-agent", "Not set")))        
+        
         # Handle MCP protocol messages
         if data.get("method") == "initialize":
             return JSONResponse(content={
@@ -1560,6 +1491,179 @@ async def sse_endpoint(request: Request):
                         "name": "fill-sign-send-mcp-server",
                         "version": "1.0.0"
                     }
+                }
+            })
+        
+        elif data.get("method") == "tools/list":
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "result": {
+                    "tools": [
+                        {
+                            "name": "getenvelope",
+                            "description": "Get envelope information",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"}
+                                },
+                                "required": ["envelope_id"]
+                            }
+                        },
+                        {
+                            "name": "fill_envelope",
+                            "description": "Fill form fields in existing DocuSign envelope",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill"}
+                                },
+                                "required": ["envelope_id", "field_data"]
+                            }
+                        },
+                        {
+                            "name": "sign_envelope",
+                            "description": "Sign existing DocuSign envelope",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "security_code": {"type": "string", "description": "Security code for signing (optional)"}
+                                },
+                                "required": ["envelope_id", "recipient_email"]
+                            }
+                        },
+                        {
+                            "name": "debug_docusign_config",
+                            "description": "Debug DocuSign configuration and environment settings",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {},
+                                "required": []
+                            }
+                        },
+                        {
+                            "name": "create_embedded_signing",
+                            "description": "Create embedded signing URL for testing without email delivery",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
+                                    "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["pdf_url"]
+                            }
+                        },
+                        {
+                            "name": "open_document_for_signing",
+                            "description": "Open existing document for signing using envelope ID",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["envelope_id"]
+                            }
+                        },
+                        {
+                            "name": "fill_document_fields",
+                            "description": "Fill form fields in existing document",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill"}
+                                },
+                                "required": ["envelope_id", "field_data"]
+                            }
+                        },
+                        {
+                            "name": "create_demo_envelope",
+                            "description": "Create a demo envelope for testing in demo environment",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
+                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
+                                    "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
+                                    "subject": {"type": "string", "description": "Email subject (optional)"},
+                                    "message": {"type": "string", "description": "Email message (optional)"}
+                                },
+                                "required": ["pdf_url"]
+                            }
+                        },
+                        {
+                            "name": "extract_access_code",
+                            "description": "Extract access code from DocuSign email content",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "email_content": {"type": "string", "description": "Full email content to search for access code"}
+                                },
+                                "required": ["email_content"]
+                            }
+                        },
+                        {
+                            "name": "extract_envelope_and_access_code",
+                            "description": "Extract both envelope ID and access code from DocuSign email content",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "email_content": {"type": "string", "description": "Full email content to search for envelope ID and access code"}
+                                },
+                                "required": ["email_content"]
+                            }
+                        },
+                        {
+                            "name": "create_recipient_view_with_code",
+                            "description": "Create recipient view URL using access code for document access",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "access_code": {"type": "string", "description": "Access code from email"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["envelope_id", "recipient_email", "access_code"]
+                            }
+                        },
+                        {
+                            "name": "access_document_with_code",
+                            "description": "Access DocuSign document using access code and complete the workflow (fill, sign, send)",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "access_code": {"type": "string", "description": "Access code extracted from email"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["access_code", "recipient_email"]
+                            }
+                        },
+                        {
+                            "name": "complete_docusign_workflow",
+                            "description": "Complete DocuSign workflow: extract envelope ID and access code from email, then fill, sign, and send document",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "email_content": {"type": "string", "description": "Full DocuSign email content containing envelope ID and access code"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address (optional, will be extracted if not provided)"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                },
+                                "required": ["email_content"]
+                            }
+                        }
+                    ]
                 }
             })
         
@@ -1610,21 +1714,12 @@ async def sse_endpoint(request: Request):
                 "code": -32603,
                 "message": str(e)
             }
-        }, status_code=200)
+        }, status_code=500)
 
 
 if __name__ == "__main__":
-    try:
-        logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server...")
-        logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
-        env = getattr(settings, "ENVIRONMENT", "unknown")
-        logger.info(f"🌍 Environment: {env}")
+    logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server...")
+    logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
+    logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
     
-        uvicorn.run(app, host="0.0.0.0", port=8000)
-    except Exception as e:
-        logger.error(f"❌ Server startup error: {e}")
-        import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
-        raise
-
-
+    uvicorn.run(app, host="0.0.0.0", port=8000)

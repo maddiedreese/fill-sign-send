@@ -1215,8 +1215,11 @@ async def mcp_endpoint(request: Request):
         logger.info(f"🔍 DEBUG: Body: {data}")
         logger.info(f"🔍 DEBUG: Raw body: {body}")
         logger.info(f"🔍 DEBUG: Request URL: {request.url}")
-        
-        # Validate required MCP fields
+        logger.info(f"🔍 DEBUG: Method: {request.method}")
+        content_type = request.headers.get("content-type", "Not set")
+        user_agent = request.headers.get("user-agent", "Not set")
+        logger.info(f"🔍 DEBUG: Content-Type: {content_type}")
+        logger.info(f"🔍 DEBUG: User-Agent: {user_agent}")        # Validate required MCP fields
         if not data.get("jsonrpc"):
             logger.error(f"❌ Missing jsonrpc field in MCP request")
             return JSONResponse(content={
@@ -1471,6 +1474,8 @@ async def mcp_endpoint(request: Request):
             
     except Exception as e:
         logger.error(f"❌ MCP POST error: {e}")
+        import traceback
+        logger.error(f"❌ MCP Traceback: {traceback.format_exc()}")
         return JSONResponse(content={
             "jsonrpc": "2.0",
             "id": data.get("id") if 'data' in locals() else None,
@@ -1478,7 +1483,7 @@ async def mcp_endpoint(request: Request):
                 "code": -32603,
                 "message": str(e)
             }
-        }, status_code=500)
+        }, status_code=200)
 
 @app.post("/sse")
 async def sse_endpoint(request: Request):
@@ -1492,7 +1497,9 @@ async def sse_endpoint(request: Request):
         logger.info(f"🔍 DEBUG: Body: {data}")
         logger.info(f"🔍 DEBUG: Raw body: {body}")
         logger.info(f"🔍 DEBUG: Request URL: {request.url}")
-        
+        logger.info(f"🔍 DEBUG: Method: {request.method}")
+        logger.info("🔍 DEBUG: Content-Type: " + str(request.headers.get("content-type", "Not set")))
+        logger.info("🔍 DEBUG: User-Agent: " + str(request.headers.get("user-agent", "Not set")))        
         # Handle MCP protocol messages
         if data.get("method") == "initialize":
             return JSONResponse(content={
@@ -1732,7 +1739,7 @@ async def sse_endpoint(request: Request):
                 "code": -32603,
                 "message": str(e)
             }
-        }, status_code=500)
+        }, status_code=200)
 
 
 if __name__ == "__main__":

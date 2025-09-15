@@ -567,6 +567,8 @@ def get_envelope_status_docusign(envelope_id: str) -> Dict[str, Any]:
         recipients_info = []
         try:
             recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
+            logger.info(f"📊 Recipients object: {recipients}")
+            logger.info(f"📊 Recipients signers: {recipients.signers if hasattr(recipients, 'signers') else 'No signers attr'}")
             if recipients.signers:
                 for signer in recipients.signers:
                     recipients_info.append({
@@ -575,8 +577,12 @@ def get_envelope_status_docusign(envelope_id: str) -> Dict[str, Any]:
                         "status": signer.status,
                         "signed_date": signer.signed_date_time
                     })
+            else:
+                logger.warning(f"No signers found in recipients: {recipients}")
         except Exception as e:
             logger.warning(f"Could not retrieve recipients: {e}")
+            import traceback
+            logger.warning(f"Recipients traceback: {traceback.format_exc()}")
             recipients_info = []
         
         logger.info(f"📊 Envelope {envelope_id} status: {envelope.status}")

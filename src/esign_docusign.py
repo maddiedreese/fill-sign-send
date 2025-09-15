@@ -563,16 +563,21 @@ def get_envelope_status_docusign(envelope_id: str) -> Dict[str, Any]:
         # Get envelope details
         envelope = envelopes_api.get_envelope(account_id=account_id, envelope_id=envelope_id)
         
-        # Get recipient information
+        # Get recipient information separately (get_envelope doesn't include recipients by default)
         recipients_info = []
-        if envelope.recipients and envelope.recipients.signers:
-            for signer in envelope.recipients.signers:
-                recipients_info.append({
-                    "email": signer.email,
-                    "name": signer.name,
-                    "status": signer.status,
-                    "signed_date": signer.signed_date_time
-                })
+        try:
+            recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
+            if recipients.signers:
+                for signer in recipients.signers:
+                    recipients_info.append({
+                        "email": signer.email,
+                        "name": signer.name,
+                        "status": signer.status,
+                        "signed_date": signer.signed_date_time
+                    })
+        except Exception as e:
+            logger.warning(f"Could not retrieve recipients: {e}")
+            recipients_info = []
         
         logger.info(f"📊 Envelope {envelope_id} status: {envelope.status}")
         

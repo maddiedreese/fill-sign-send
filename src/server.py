@@ -1163,7 +1163,6 @@ async def debug_endpoint(request: Request):
     logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
     logger.info(f"🔍 DEBUG: Query params: {dict(request.query_params)}")
     return {"message": "Debug endpoint", "client_ip": str(request.client.host), "headers": dict(request.headers)}
-
 @app.post("/debug")
 async def debug_post_endpoint(request: Request):
     """Debug endpoint to log all POST requests from Poke."""

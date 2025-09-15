@@ -421,69 +421,60 @@ def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code
             }
         
         # Try to create recipient view
-        try:
-            # First, get the envelope recipients to validate the email
-            recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
-            
-            # Debug: Log all recipients
-            logger.info(f"🔍 DEBUG: All recipients for envelope {envelope_id}:")
-            for i, signer in enumerate(recipients.signers):
-                logger.info(f"🔍 DEBUG: Recipient {i}: email='{signer.email}', name='{signer.name}', status='{signer.status}', recipient_id='{signer.recipient_id}'")
-            
-            # Check if the recipient email exists in the envelope
-            valid_recipient = None
-            for signer in recipients.signers:
-                logger.info(f"🔍 DEBUG: Comparing '{signer.email.lower()}' with '{recipient_email.lower()}'")
-                if signer.email.lower() == recipient_email.lower():
-                    valid_recipient = signer
-                    logger.info(f"🔍 DEBUG: Found valid recipient: {valid_recipient.email}")
-                    break
-            
-            if not valid_recipient:
-                logger.error(f"❌ DEBUG: No valid recipient found for email '{recipient_email}'")
-                return {
-                    "success": False,
-                    "error": f"Recipient {recipient_email} is not a valid recipient of envelope {envelope_id}",
-                    "message": "The recipient email is not associated with this envelope"
-                }
-            
-            # Try a minimal recipient view request first
-            from docusign_esign.models import RecipientViewRequest
-            
-            logger.info(f"🔍 DEBUG: Creating minimal recipient view request")
-            
-            # Try with minimal parameters first
-            recipient_view_request = RecipientViewRequest(
-                authentication_method="none",
-                email=valid_recipient.email,
-                return_url="https://docusign.com"
-            )
-            
-            logger.info(f"🔍 DEBUG: About to call create_recipient_view with minimal parameters")
-            
-            # Get recipient view URL
-            result = envelopes_api.create_recipient_view(
-                account_id=account_id,
-                envelope_id=envelope_id,
-                recipient_view_request=recipient_view_request
-            )
-            
-            logger.info(f"✍️ Created signing URL for envelope {envelope_id}")
-            
+        # First, get the envelope recipients to validate the email
+        recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
+        
+        # Debug: Log all recipients
+        logger.info(f"🔍 DEBUG: All recipients for envelope {envelope_id}:")
+        for i, signer in enumerate(recipients.signers):
+            logger.info(f"🔍 DEBUG: Recipient {i}: email='{signer.email}', name='{signer.name}', status='{signer.status}', recipient_id='{signer.recipient_id}'")
+        
+        # Check if the recipient email exists in the envelope
+        valid_recipient = None
+        for signer in recipients.signers:
+            logger.info(f"🔍 DEBUG: Comparing '{signer.email.lower()}' with '{recipient_email.lower()}'")
+            if signer.email.lower() == recipient_email.lower():
+                valid_recipient = signer
+                logger.info(f"🔍 DEBUG: Found valid recipient: {valid_recipient.email}")
+                break
+        
+        if not valid_recipient:
+            logger.error(f"❌ DEBUG: No valid recipient found for email '{recipient_email}'")
             return {
-                "success": True,
-                "signing_url": result.url,
-                "message": f"Signing URL created for envelope {envelope_id}",
-                "envelope_id": envelope_id
+                "success": False,
+                "error": f"Recipient {recipient_email} is not a valid recipient of envelope {envelope_id}",
+                "message": "The recipient email is not associated with this envelope"
             }
-        else:
-            # Just return envelope status
-            return {
-                "success": True,
-                "envelope_id": envelope_id,
-                "status": envelope.status,
-                "message": f"Envelope {envelope_id} status: {envelope.status}"
-            }
+        
+        # Try a minimal recipient view request first
+        from docusign_esign.models import RecipientViewRequest
+        
+        logger.info(f"🔍 DEBUG: Creating minimal recipient view request")
+        
+        # Try with minimal parameters first
+        recipient_view_request = RecipientViewRequest(
+            authentication_method="none",
+            email=valid_recipient.email,
+            return_url="https://docusign.com"
+        )
+        
+        logger.info(f"🔍 DEBUG: About to call create_recipient_view with minimal parameters")
+        
+        # Get recipient view URL
+        result = envelopes_api.create_recipient_view(
+            account_id=account_id,
+            envelope_id=envelope_id,
+            recipient_view_request=recipient_view_request
+        )
+        
+        logger.info(f"✍️ Created signing URL for envelope {envelope_id}")
+        
+        return {
+            "success": True,
+            "signing_url": result.url,
+            "message": f"Signing URL created for envelope {envelope_id}",
+            "envelope_id": envelope_id
+        }
         
     except Exception as e:
         logger.error(f"Error signing envelope: {e}")

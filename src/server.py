@@ -1225,16 +1225,6 @@ async def mcp_endpoint(request: Request):
             data["method"] = "tools/list"
             logger.info("🔧 Defaulting to tools/list for request without method")
         
-        # Handle MCP protocol messages        if not data.get("method"):
-            logger.error(f"❌ Missing method field in MCP request")
-            return JSONResponse(content={
-                "jsonrpc": "2.0",
-                "id": data.get("id"),
-                "error": {
-                    "code": -32600,
-                    "message": "Invalid Request: Missing method field"
-                }
-            }, status_code=200)
         
         # Handle MCP protocol messages
         if data.get("method") == "initialize":

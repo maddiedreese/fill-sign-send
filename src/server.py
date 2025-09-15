@@ -46,6 +46,16 @@ if not USE_REAL_APIS:
 # Initialize FastMCP
 mcp = FastMCP("Doc Filling + E-Signing MCP Server")
 
+# Add health check tool for Render
+@mcp.tool(description="Health check endpoint for Render")
+def health_check() -> dict:
+    """Health check endpoint for Render."""
+    return {
+        "status": "healthy", 
+        "message": "Server is running",
+        "timestamp": "2024-01-01T00:00:00Z"
+    }
+
 @mcp.tool(description="Get server information and configuration status")
 def get_server_info() -> dict:
     """Get server information and configuration status."""
@@ -512,10 +522,21 @@ if __name__ == "__main__":
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
     logger.info(f"🌐 Starting FastMCP server on {host}:{port}")
     
-    # Run the FastMCP server using the template's correct configuration
-    mcp.run(
-        transport="http",
-        host=host,
-        port=port,
-        stateless_http=True
-    )
+    try:
+        # Run the FastMCP server with improved configuration
+        mcp.run(
+            transport="http",
+            host=host,
+            port=port,
+            stateless_http=True,
+            # Add timeout configurations to prevent premature shutdown
+            timeout_keep_alive=30,
+            timeout_graceful_shutdown=30
+        )
+    except KeyboardInterrupt:
+        logger.info("🛑 Server shutdown requested by user")
+    except Exception as e:
+        logger.error(f"❌ Server error: {e}")
+        raise
+    finally:
+        logger.info("🏁 Server shutdown complete")

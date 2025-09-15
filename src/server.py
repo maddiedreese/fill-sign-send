@@ -1737,8 +1737,15 @@ async def sse_endpoint(request: Request):
 
 
 if __name__ == "__main__":
-    logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server...")
-    logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
-    logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
+    try:
+        logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server...")
+        logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
+        env = getattr(settings, "ENVIRONMENT", "unknown")
+        logger.info(f"🌍 Environment: {env}")
     
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+    except Exception as e:
+        logger.error(f"❌ Server startup error: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        raise

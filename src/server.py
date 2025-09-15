@@ -1296,10 +1296,10 @@ async def mcp_endpoint(request: Request):
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"}
                                 },
                                 "required": ["envelope_id"]
-                            },
+                            }
                         },
                         {
                             "name": "fill_envelope",
@@ -1311,7 +1311,7 @@ async def mcp_endpoint(request: Request):
                                     "field_data": {"type": "object", "description": "Form field data to fill"}
                                 },
                                 "required": ["envelope_id", "field_data"]
-                            },
+                            }
                         },
                         {
                             "name": "sign_envelope",
@@ -1321,138 +1321,70 @@ async def mcp_endpoint(request: Request):
                                 "properties": {
                                     "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
                                     "recipient_email": {"type": "string", "description": "Recipient email address"},
-                                    "security_code": {"type": "string", "description": "Security code for signing (optional)"},
+                                    "security_code": {"type": "string", "description": "Security code for signing (optional)"}
                                 },
                                 "required": ["envelope_id", "recipient_email"]
-                            },
+                            }
                         },
                         {
-                            "name": "debug_docusign_config",
-                            "description": "Debug DocuSign configuration and environment settings",
+                            "name": "submit_envelope",
+                            "description": "Submit DocuSign envelope for processing",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"}
+                                },
+                                "required": ["envelope_id"]
+                            }
+                        },
+                        {
+                            "name": "get_envelope_status",
+                            "description": "Get status and form fields of DocuSign envelope",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"}
+                                },
+                                "required": ["envelope_id"]
+                            }
+                        },
+                        {
+                            "name": "complete_signing",
+                            "description": "Complete the signing process for a DocuSign envelope",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "field_data": {"type": "object", "description": "Form field data to fill (optional)"}
+                                },
+                                "required": ["envelope_id", "recipient_email"]
+                            }
+                        },
+                        {
+                            "name": "send_for_signature",
+                            "description": "Send document for signature via DocuSign",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "file_url": {"type": "string", "description": "URL to PDF file"},
+                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
+                                    "recipient_name": {"type": "string", "description": "Recipient name"},
+                                    "subject": {"type": "string", "description": "Email subject"},
+                                    "message": {"type": "string", "description": "Email message"}
+                                },
+                                "required": ["file_url", "recipient_email", "recipient_name"]
+                            }
+                        },
+                        {
+                            "name": "get_server_info",
+                            "description": "Get server information and status",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {},
                                 "required": []
-                            },
-                        },
-                        {
-                            "name": "create_embedded_signing",
-                            "description": "Create embedded signing URL for testing without email delivery",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
-                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
-                                    "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
-                                },
-                                "required": ["pdf_url"]
-                            },
-                        },
-                        {
-                            "name": "open_document_for_signing",
-                            "description": "Open existing document for signing using envelope ID",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
-                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
-                                },
-                                "required": ["envelope_id"]
-                            },
-                        },
-                        {
-                            "name": "fill_document_fields",
-                            "description": "Fill form fields in existing document",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
-                                    "field_data": {"type": "object", "description": "Form field data to fill"}
-                                },
-                                "required": ["envelope_id", "field_data"]
-                            },
-                        },
-                        {
-                            "name": "create_demo_envelope",
-                            "description": "Create a demo envelope for testing in demo environment",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "pdf_url": {"type": "string", "description": "URL to PDF file"},
-                                    "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
-                                    "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
-                                    "subject": {"type": "string", "description": "Email subject (optional)"},
-                                    "message": {"type": "string", "description": "Email message (optional)"},
-                                },
-                                "required": ["pdf_url"]
-                            },
-                        },
-                        {
-                            "name": "extract_access_code",
-                            "description": "Extract access code from DocuSign email content",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "email_content": {"type": "string", "description": "Full email content to search for access code"}
-                                },
-                                "required": ["email_content"]
-                            },
-                        },
-                        {
-                            "name": "extract_envelope_and_access_code",
-                            "description": "Extract both envelope ID and access code from DocuSign email content",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "email_content": {"type": "string", "description": "Full email content to search for envelope ID and access code"}
-                                },
-                                "required": ["email_content"]
-                            },
-                        },
-                        {
-                            "name": "create_recipient_view_with_code",
-                            "description": "Create recipient view URL using access code for document access",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
-                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
-                                    "access_code": {"type": "string", "description": "Access code from email"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
-                                },
-                                "required": ["envelope_id", "recipient_email", "access_code"]
-                            },
-                        },
-                        {
-                            "name": "access_document_with_code",
-                            "description": "Access DocuSign document using access code and complete the workflow (fill, sign, send)",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "access_code": {"type": "string", "description": "Access code extracted from email"},
-                                    "recipient_email": {"type": "string", "description": "Recipient email address"},
-                                    "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
-                                },
-                                "required": ["access_code", "recipient_email"]
-                            },
-                        },
-                        {
-                            "name": "complete_docusign_workflow",
-                                "type": "object",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "email_content": {"type": "string", "description": "Full DocuSign email content containing envelope ID and access code"},
-                                    "recipient_email": {"type": "string", "description": "Recipient email address (optional, will be extracted if not provided)"},
-                                    "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
-                                },
-                                "required": ["email_content"]
-                            },
-                        },
+                            }
+                        }
                     ]
                 }
             })

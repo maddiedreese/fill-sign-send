@@ -420,8 +420,8 @@ def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code
                 "message": "Only sent or delivered envelopes can be signed"
             }
         
-        # If security code provided, authenticate and sign
-        if security_code:
+        # Always try to create recipient view (with or without security code)
+        if True:  # Always try to create recipient view
             # First, get the envelope recipients to validate the email
             recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
             
@@ -457,7 +457,7 @@ def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code
             logger.info(f"🔍 DEBUG: - recipient_id: {valid_recipient.recipient_id}")
             
             recipient_view_request = RecipientViewRequest(
-                authentication_method="none",
+                authentication_method="email",
                 email=recipient_email,
                 user_name=valid_recipient.name or recipient_email,
                 client_user_id=valid_recipient.client_user_id or recipient_email,

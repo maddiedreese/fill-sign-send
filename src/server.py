@@ -121,7 +121,7 @@ def handle_get_server_info(args):
             docusign_valid = False
             poke_valid = False
         
-    return {
+        return {
             "success": True,
             "server": {"name": "Doc Filling + E-Signing MCP Server", "version": "1.0.0", "status": "running"},
             "config": {

@@ -425,14 +425,22 @@ def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code
             # First, get the envelope recipients to validate the email
             recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
             
+            # Debug: Log all recipients
+            logger.info(f"🔍 DEBUG: All recipients for envelope {envelope_id}:")
+            for i, signer in enumerate(recipients.signers):
+                logger.info(f"🔍 DEBUG: Recipient {i}: email='{signer.email}', name='{signer.name}', status='{signer.status}'")
+            
             # Check if the recipient email exists in the envelope
             valid_recipient = None
             for signer in recipients.signers:
+                logger.info(f"🔍 DEBUG: Comparing '{signer.email.lower()}' with '{recipient_email.lower()}'")
                 if signer.email.lower() == recipient_email.lower():
                     valid_recipient = signer
+                    logger.info(f"🔍 DEBUG: Found valid recipient: {valid_recipient.email}")
                     break
             
             if not valid_recipient:
+                logger.error(f"❌ DEBUG: No valid recipient found for email '{recipient_email}'")
                 return {
                     "success": False,
                     "error": f"Recipient {recipient_email} is not a valid recipient of envelope {envelope_id}",

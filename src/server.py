@@ -271,10 +271,10 @@ def handle_getenvelope(args: Dict[str, Any]) -> Dict[str, Any]:
         
         # If we have a link, extract envelope ID from it
         if link and not envelope_id:
-            if "docusign.net/signing/documents/" in link:
+            if "docusign.net" in link:
                 # Extract envelope ID from DocuSign signing link
                 import re
-                match = re.search(r"/signing/documents/([a-f0-9-]+)", link)
+                match = re.search(r"/documents/([a-f0-9-]+)", link)
                 if match:
                     envelope_id = match.group(1)
                     logger.info(f"📋 Extracted envelope_id from link: {envelope_id}")

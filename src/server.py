@@ -1457,6 +1457,24 @@ async def mcp_endpoint(request: Request):
             })
             
     except Exception as e:
+        # Catch-all for any unknown methods
+        logger.warning(f"⚠️  Unknown MCP method: {data.get("method")} - defaulting to tools/list")
+        return JSONResponse(content={
+            "jsonrpc": "2.0",
+            "id": data.get("id"),
+            "result": {
+                "tools": [
+                    {"name": "getenvelope"},
+                    {"name": "fill_envelope"},
+                    {"name": "sign_envelope"},
+                    {"name": "submit_envelope"},
+                    {"name": "get_envelope_status"},
+                    {"name": "send_for_signature"},
+                    {"name": "get_server_info"},
+                    {"name": "debug_docusign_config"}
+                ]
+            }
+        })
         logger.error(f"❌ MCP POST error: {e}")
         import traceback
         logger.error(f"❌ MCP Traceback: {traceback.format_exc()}")

@@ -1189,7 +1189,7 @@ async def mcp_endpoint(request: Request):
                     "code": -32700,
                     "message": "Parse error: Invalid JSON"
                 }
-            }, status_code=400)
+            }, status_code=200)
         
         logger.info(f"📡 MCP POST request from {request.client.host}")
         logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
@@ -1207,7 +1207,7 @@ async def mcp_endpoint(request: Request):
                     "code": -32600,
                     "message": "Invalid Request: Missing jsonrpc field"
                 }
-            }, status_code=400)
+            }, status_code=200)
         
         if not data.get("method"):
             logger.error(f"❌ Missing method field in MCP request")
@@ -1218,7 +1218,7 @@ async def mcp_endpoint(request: Request):
                     "code": -32600,
                     "message": "Invalid Request: Missing method field"
                 }
-            }, status_code=400)
+            }, status_code=200)
         
         # Handle MCP protocol messages
         if data.get("method") == "initialize":

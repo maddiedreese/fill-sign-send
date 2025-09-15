@@ -1483,6 +1483,10 @@ async def sse_endpoint(request: Request):
         logger.info(f"🔍 DEBUG: Body: {data}")
         logger.info(f"🔍 DEBUG: Raw body: {body}")
         logger.info(f"🔍 DEBUG: Request URL: {request.url}")
+        logger.info(f"🔍 DEBUG: Method: {request.method}")
+        logger.info(f"🔍 DEBUG: Client IP: {request.client.host if request.client else 'unknown'}")
+        logger.info(f"🔍 DEBUG: User-Agent: {request.headers.get('user-agent', 'unknown')}")
+        logger.info(f"🔍 DEBUG: Content-Type: {request.headers.get('content-type', 'unknown')}")
         
         # Validate required MCP fields
         if not data.get("jsonrpc"):

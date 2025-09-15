@@ -122,7 +122,6 @@ def handle_get_server_info(args):
             poke_valid = False
         
         return {
-            "success": True,
             "server": {"name": "Doc Filling + E-Signing MCP Server", "version": "1.0.0", "status": "running"},
             "config": {
                 "docusign": {"configured": docusign_valid, "environment": settings.ENVIRONMENT},
@@ -148,7 +147,7 @@ def handle_fill_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
         if not field_data:
             return {"success": False, "error": "field_data is required", "message": "Please provide field_data to fill"}
         
-        logger.info(f"📝 fill_envelope called with envelope_id: {envelope_id}, field_data: {field_data}")
+        logger.info(f"📝 fill_envelope called with envelope_id: {envelope_id} field_data: {field_data}")
         
         if USE_REAL_APIS:
             logger.info("🔗 Using REAL DocuSign API")
@@ -191,7 +190,7 @@ def handle_sign_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
         if not recipient_email:
             return {"success": False, "error": "recipient_email is required", "message": "Please provide recipient_email"}
         
-        logger.info(f"✍️ sign_envelope called with envelope_id: {envelope_id}, recipient_email: {recipient_email}")
+        logger.info(f"✍️ sign_envelope called with envelope_id: {envelope_id} recipient_email: {recipient_email}")
         
         if USE_REAL_APIS:
             logger.info("🔗 Using REAL DocuSign API")
@@ -277,7 +276,7 @@ def handle_complete_signing(args: Dict[str, Any]) -> Dict[str, Any]:
         if not recipient_email:
             return {"success": False, "error": "recipient_email is required", "message": "Please provide recipient_email"}
         
-        logger.info(f"✍️ complete_signing called with envelope_id: {envelope_id}, recipient_email: {recipient_email}")
+        logger.info(f"✍️ complete_signing called with envelope_id: {envelope_id} recipient_email: {recipient_email}")
         
         if USE_REAL_APIS:
             logger.info("🔗 Using REAL DocuSign API")
@@ -314,7 +313,7 @@ def handle_getenvelope(args: Dict[str, Any]) -> Dict[str, Any]:
         link = args.get("link")
         security_code = args.get("security_code")
         
-        logger.info(f"📋 getenvelope called with envelope_id: {envelope_id}, link: {link}, security_code: {security_code}")
+        logger.info(f"📋 getenvelope called with envelope_id: {envelope_id} link: {link} security_code: {security_code}")
         
         # If we have a link, extract envelope ID from it
         if link and not envelope_id:
@@ -357,7 +356,7 @@ def handle_getenvelope(args: Dict[str, Any]) -> Dict[str, Any]:
                         "completed_date": result.get("completed_date"),
                         "recipients": result.get("recipients", []),
                         "message": "Envelope retrieved successfully"
-                    }
+                    },
                 else:
                     error_msg = result.get("error", "Unknown error")
                     logger.error(f"❌ DocuSign API error: {error_msg}")
@@ -406,7 +405,7 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
                         "recipients": result.get("recipients", []),
                         "docusign_environment": settings.DOCUSIGN_BASE_PATH,
                         "account_id": settings.DOCUSIGN_ACCOUNT_ID
-                    }
+                    },
                 else:
                     error_msg = result.get("error", "Unknown error")
                     logger.error(f"❌ DocuSign API error: {error_msg}")
@@ -417,7 +416,7 @@ def handle_get_envelope_status(args: Dict[str, Any]) -> Dict[str, Any]:
                         "docusign_environment": settings.DOCUSIGN_BASE_PATH,
                         "account_id": settings.DOCUSIGN_ACCOUNT_ID,
                         "troubleshooting": "If you're getting 404 errors, the envelope might be in a different DocuSign environment (demo vs production) or account"
-                    }
+                    },
                     
             except Exception as e:
                 logger.error(f"❌ DocuSign API exception: {e}")
@@ -532,7 +531,7 @@ def handle_create_embedded_signing(args: Dict[str, Any]) -> Dict[str, Any]:
                             "4. Use the envelope_id with other tools to check status"
                         ],
                         "note": "This works in demo environment without Go Live permissions"
-                    }
+                    },
                 else:
                     return {"success": False, "error": result.get("error"), "message": "Failed to create embedded signing URL"}
                     
@@ -557,7 +556,7 @@ def handle_create_embedded_signing(args: Dict[str, Any]) -> Dict[str, Any]:
                     "4. Use the envelope_id with other tools to check status"
                 ],
                 "note": "This works in demo environment without Go Live permissions"
-            }
+            },
             
     except Exception as e:
         logger.error(f"❌ create_embedded_signing error: {e}")
@@ -597,7 +596,7 @@ def handle_open_document_for_signing(args: Dict[str, Any]) -> Dict[str, Any]:
                             "3. Complete the signing process",
                             "4. You'll be redirected to the return_url when done"
                         ]
-                    }
+                    },
                 else:
                     return {"success": False, "error": result.get("error"), "message": "Failed to open document for signing"}
                     
@@ -620,7 +619,7 @@ def handle_open_document_for_signing(args: Dict[str, Any]) -> Dict[str, Any]:
                     "3. Complete the signing process",
                     "4. You'll be redirected to the return_url when done"
                 ]
-            }
+            },
             
     except Exception as e:
         logger.error(f"❌ open_document_for_signing error: {e}")
@@ -656,7 +655,7 @@ def handle_fill_document_fields(args: Dict[str, Any]) -> Dict[str, Any]:
                         "filled_fields": result.get("filled_fields", []),
                         "message": "Document fields filled successfully",
                         "next_steps": "You can now open the document for signing using 'open_document_for_signing'"
-                    }
+                    },
                 else:
                     return {"success": False, "error": result.get("error"), "message": "Failed to fill document fields"}
                     
@@ -673,7 +672,7 @@ def handle_fill_document_fields(args: Dict[str, Any]) -> Dict[str, Any]:
                 "filled_fields": list(field_data.keys()),
                 "message": "Document fields filled successfully (MOCK)",
                 "next_steps": "You can now open the document for signing using 'open_document_for_signing'"
-            }
+            },
             
     except Exception as e:
         logger.error(f"❌ fill_document_fields error: {e}")
@@ -735,7 +734,7 @@ def handle_create_demo_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
                             "4. Check your email for the signing link"
                         ],
                         "note": "This envelope was created in the demo environment and can be used for testing"
-                    }
+                    },
                 else:
                     return {"success": False, "error": result.get("error"), "message": "Failed to create demo envelope"}
                     
@@ -759,7 +758,7 @@ def handle_create_demo_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
                     "3. Use 'open_document_for_signing' to open for signing"
                 ],
                 "note": "This is a mock envelope for testing purposes"
-            }
+            },
             
     except Exception as e:
         logger.error(f"❌ create_demo_envelope error: {e}")
@@ -809,7 +808,7 @@ def handle_extract_access_code(args: Dict[str, Any]) -> Dict[str, Any]:
                 "access_code": access_code,
                 "all_codes": filtered_codes,
                 "message": f"Extracted access code: {access_code}"
-            }
+            },
         else:
             logger.warning("⚠️ No access code found in email content")
             return {
@@ -821,7 +820,7 @@ def handle_extract_access_code(args: Dict[str, Any]) -> Dict[str, Any]:
                     "Check for 'Security code: ABC123'",
                     "Ensure the email contains a 4-8 character alphanumeric code"
                 ]
-            }
+            },
             
     except Exception as e:
         logger.error(f"❌ extract_access_code error: {e}")
@@ -889,26 +888,26 @@ def handle_extract_envelope_and_access_code(args: Dict[str, Any]) -> Dict[str, A
                 "access_code": filtered_access_codes[0],
                 "message": f"Found envelope ID: {unique_envelope_ids[0]} and access code: {filtered_access_codes[0]}",
                 "ready_for_workflow": True
-            })
+            },)
         elif unique_envelope_ids:
             result.update({
                 "envelope_id": unique_envelope_ids[0],
                 "message": f"Found envelope ID: {unique_envelope_ids[0]} but no access code",
                 "ready_for_workflow": False
-            })
+            },)
         elif filtered_access_codes:
             result.update({
                 "access_code": filtered_access_codes[0],
                 "message": f"Found access code: {filtered_access_codes[0]} but no envelope ID",
                 "ready_for_workflow": False
-            })
+            },)
         else:
             result.update({
                 "success": False,
                 "error": "No envelope ID or access code found",
                 "message": "Could not find envelope ID or access code in email content",
                 "ready_for_workflow": False
-            })
+            },)
         
         logger.info(f"🔍 Extraction result: {result}")
         return result
@@ -932,7 +931,7 @@ def handle_create_recipient_view_with_code(args: Dict[str, Any]) -> Dict[str, An
         if not access_code:
             return {"success": False, "error": "access_code is required", "message": "Please provide access_code"}
         
-        logger.info(f"🔗 create_recipient_view_with_code called with envelope_id: {envelope_id}, recipient_email: {recipient_email}")
+        logger.info(f"🔗 create_recipient_view_with_code called with envelope_id: {envelope_id} recipient_email: {recipient_email}")
         
         if USE_REAL_APIS:
             logger.info("🔗 Using REAL DocuSign API")
@@ -949,7 +948,7 @@ def handle_create_recipient_view_with_code(args: Dict[str, Any]) -> Dict[str, An
                         "envelope_id": result["envelope_id"],
                         "recipient_email": recipient_email,
                         "message": "Recipient view URL created successfully"
-                    }
+                    },
                 else:
                     error_msg = result.get("error", "Unknown error")
                     logger.error(f"❌ DocuSign API error: {error_msg}")
@@ -980,7 +979,7 @@ def handle_access_document_with_code(args: Dict[str, Any]) -> Dict[str, Any]:
         if not recipient_email:
             return {"success": False, "error": "recipient_email is required", "message": "Please provide recipient_email"}
         
-        logger.info(f"🔐 access_document_with_code called with access_code: {access_code}, recipient_email: {recipient_email}")
+        logger.info(f"🔐 access_document_with_code called with access_code: {access_code} recipient_email: {recipient_email}")
         
         if USE_REAL_APIS:
             logger.info("🔗 Using REAL DocuSign API")
@@ -1000,7 +999,7 @@ def handle_access_document_with_code(args: Dict[str, Any]) -> Dict[str, Any]:
                         "message": "Document accessed successfully with access code",
                         "workflow_completed": result.get("workflow_completed", False),
                         "next_steps": result.get("next_steps", [])
-                    }
+                    },
                 else:
                     error_msg = result.get("error", "Unknown error")
                     logger.error(f"❌ DocuSign API error: {error_msg}")
@@ -1037,7 +1036,7 @@ def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
                 "error": "Extraction failed",
                 "message": "Could not extract envelope ID and access code from email",
                 "extraction_result": extraction_result
-            }
+            },
         
         if not extraction_result.get("ready_for_workflow"):
             return {
@@ -1050,12 +1049,12 @@ def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
                     "Look for UUID patterns (envelope ID) and access code patterns",
                     "Ensure the email is from DocuSign"
                 ]
-            }
+            },
         
         envelope_id = extraction_result.get("envelope_id")
         access_code = extraction_result.get("access_code")
         
-        logger.info(f"✅ Step 1 complete: envelope_id={envelope_id}, access_code={access_code}")
+        logger.info(f"✅ Step 1 complete: envelope_id={envelope_id} access_code={access_code}")
         
         # Step 2: Create recipient view with access code
         logger.info("🔗 Step 2: Creating recipient view with access code...")
@@ -1073,7 +1072,7 @@ def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
                 "message": "Could not create recipient view with access code",
                 "extraction_result": extraction_result,
                 "recipient_view_result": recipient_view_result
-            }
+            },
         
         signing_url = recipient_view_result.get("signing_url")
         logger.info(f"✅ Step 2 complete: signing_url created")
@@ -1084,7 +1083,7 @@ def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
             fill_result = handle_fill_document_fields({
                 "envelope_id": envelope_id,
                 "field_data": field_data
-            })
+            },)
             
             if not fill_result.get("success"):
                 logger.warning(f"⚠️ Step 3 failed: {fill_result.get('error')}")
@@ -1194,7 +1193,7 @@ def download_file_from_url(url):
 @app.get("/")
 async def root():
     """Root endpoint that returns basic information about the service."""
-    return {"message": "Fill Sign Send API", "status": "running"}
+    return {"message": "Fill Sign Send API", "status": "running"},
 
 @app.get("/debug")
 async def debug_endpoint(request: Request):
@@ -1211,7 +1210,7 @@ async def debug_post_endpoint(request: Request):
     logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
     logger.info(f"🔍 DEBUG: Body: {body.decode() if body else 'No body'}")
     return {"message": "Debug POST endpoint", "client_ip": str(request.client.host), "body": body.decode() if body else "No body"}
-    return {"message": "Doc Filling + E-Signing MCP Server", "status": "running"}
+    return {"message": "Doc Filling + E-Signing MCP Server", "status": "running"},
 
 @app.get("/mcp")
 async def mcp_get_endpoint(request: Request):
@@ -1224,12 +1223,12 @@ async def mcp_get_endpoint(request: Request):
             "capabilities": {
                 "tools": {
                     "listChanged": True
-                }
+                },
             },
             "serverInfo": {
                 "name": "fill-sign-send-mcp-server",
                 "version": "1.0.0"
-            }
+            },
         }
     })
 @app.post("/mcp")
@@ -1247,7 +1246,7 @@ async def mcp_endpoint(request: Request):
                 "error": {
                     "code": -32700,
                     "message": "Parse error: Invalid JSON"
-                }
+                },
             }, status_code=200)
         
         logger.info(f"📡 MCP POST request from {request.client.host}")
@@ -1276,14 +1275,14 @@ async def mcp_endpoint(request: Request):
                     "capabilities": {
                         "tools": {
                             "listChanged": True
-                        }
+                        },
                     },
                     "serverInfo": {
                         "name": "fill-sign-send-mcp-server",
                         "version": "1.0.0"
-                    }
-                }
-            })
+                    },
+                },
+            },)
         
         elif data.get("method") == "tools/list":
             return JSONResponse(content={
@@ -1300,7 +1299,7 @@ async def mcp_endpoint(request: Request):
                                     "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
                                 },
                                 "required": ["envelope_id"]
-                            }
+                            },
                         },
                         {
                             "name": "fill_envelope",
@@ -1312,7 +1311,7 @@ async def mcp_endpoint(request: Request):
                                     "field_data": {"type": "object", "description": "Form field data to fill"}
                                 },
                                 "required": ["envelope_id", "field_data"]
-                            }
+                            },
                         },
                         {
                             "name": "sign_envelope",
@@ -1322,10 +1321,10 @@ async def mcp_endpoint(request: Request):
                                 "properties": {
                                     "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
                                     "recipient_email": {"type": "string", "description": "Recipient email address"},
-                                    "security_code": {"type": "string", "description": "Security code for signing (optional)"}
+                                    "security_code": {"type": "string", "description": "Security code for signing (optional)"},
                                 },
                                 "required": ["envelope_id", "recipient_email"]
-                            }
+                            },
                         },
                         {
                             "name": "debug_docusign_config",
@@ -1334,7 +1333,7 @@ async def mcp_endpoint(request: Request):
                                 "type": "object",
                                 "properties": {},
                                 "required": []
-                            }
+                            },
                         },
                         {
                             "name": "create_embedded_signing",
@@ -1345,10 +1344,10 @@ async def mcp_endpoint(request: Request):
                                     "pdf_url": {"type": "string", "description": "URL to PDF file"},
                                     "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
                                     "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
                                 },
                                 "required": ["pdf_url"]
-                            }
+                            },
                         },
                         {
                             "name": "open_document_for_signing",
@@ -1358,10 +1357,10 @@ async def mcp_endpoint(request: Request):
                                 "properties": {
                                     "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
                                     "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
                                 },
                                 "required": ["envelope_id"]
-                            }
+                            },
                         },
                         {
                             "name": "fill_document_fields",
@@ -1373,7 +1372,7 @@ async def mcp_endpoint(request: Request):
                                     "field_data": {"type": "object", "description": "Form field data to fill"}
                                 },
                                 "required": ["envelope_id", "field_data"]
-                            }
+                            },
                         },
                         {
                             "name": "create_demo_envelope",
@@ -1385,10 +1384,10 @@ async def mcp_endpoint(request: Request):
                                     "signer_email": {"type": "string", "description": "Signer email (defaults to test@example.com)"},
                                     "signer_name": {"type": "string", "description": "Signer name (defaults to Test Signer)"},
                                     "subject": {"type": "string", "description": "Email subject (optional)"},
-                                    "message": {"type": "string", "description": "Email message (optional)"}
+                                    "message": {"type": "string", "description": "Email message (optional)"},
                                 },
                                 "required": ["pdf_url"]
-                            }
+                            },
                         },
                         {
                             "name": "extract_access_code",
@@ -1399,7 +1398,7 @@ async def mcp_endpoint(request: Request):
                                     "email_content": {"type": "string", "description": "Full email content to search for access code"}
                                 },
                                 "required": ["email_content"]
-                            }
+                            },
                         },
                         {
                             "name": "extract_envelope_and_access_code",
@@ -1410,7 +1409,7 @@ async def mcp_endpoint(request: Request):
                                     "email_content": {"type": "string", "description": "Full email content to search for envelope ID and access code"}
                                 },
                                 "required": ["email_content"]
-                            }
+                            },
                         },
                         {
                             "name": "create_recipient_view_with_code",
@@ -1421,10 +1420,10 @@ async def mcp_endpoint(request: Request):
                                     "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
                                     "recipient_email": {"type": "string", "description": "Recipient email address"},
                                     "access_code": {"type": "string", "description": "Access code from email"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
                                 },
                                 "required": ["envelope_id", "recipient_email", "access_code"]
-                            }
+                            },
                         },
                         {
                             "name": "access_document_with_code",
@@ -1435,10 +1434,10 @@ async def mcp_endpoint(request: Request):
                                     "access_code": {"type": "string", "description": "Access code extracted from email"},
                                     "recipient_email": {"type": "string", "description": "Recipient email address"},
                                     "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
                                 },
                                 "required": ["access_code", "recipient_email"]
-                            }
+                            },
                         },
                         {
                             "name": "complete_docusign_workflow",
@@ -1449,14 +1448,14 @@ async def mcp_endpoint(request: Request):
                                     "email_content": {"type": "string", "description": "Full DocuSign email content containing envelope ID and access code"},
                                     "recipient_email": {"type": "string", "description": "Recipient email address (optional, will be extracted if not provided)"},
                                     "field_data": {"type": "object", "description": "Form field data to fill (optional)"},
-                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"}
+                                    "return_url": {"type": "string", "description": "Return URL after signing (optional)"},
                                 },
                                 "required": ["email_content"]
-                            }
-                        }
+                            },
+                        },
                     ]
-                }
-            })
+                },
+            },)
         
         elif data.get("method") == "tools/call":
             tool_name = data.get("params", {}).get("name")
@@ -1472,10 +1471,10 @@ async def mcp_endpoint(request: Request):
                             {
                                 "type": "text",
                                 "text": json.dumps(result)
-                            }
+                            },
                         ]
-                    }
-                })
+                    },
+                },)
             else:
                 return JSONResponse(content={
                     "jsonrpc": "2.0",
@@ -1483,8 +1482,8 @@ async def mcp_endpoint(request: Request):
                     "error": {
                         "code": -32601,
                         "message": f"Tool '{tool_name}' not found"
-                    }
-                })
+                    },
+                },)
         
         else:
             return JSONResponse(content={
@@ -1493,8 +1492,8 @@ async def mcp_endpoint(request: Request):
                 "error": {
                     "code": -32601,
                     "message": f"Method '{data.get('method')}' not found"
-                }
-            })
+                },
+            },)
             
     except Exception as e:
         # Catch-all for any unknown methods
@@ -1513,9 +1512,9 @@ async def mcp_endpoint(request: Request):
                     {"name": "get_envelope_status"},
                     {"name": "send_for_signature"},
                     {"name": "get_server_info"},
-                    {"name": "debug_docusign_config"}
+                    {"name": "debug_docusign_config"},
                 ]
-            }
+            },
         })
         logger.error(f"❌ MCP POST error: {e}")
         import traceback
@@ -1526,7 +1525,7 @@ async def mcp_endpoint(request: Request):
             "error": {
                 "code": -32603,
                 "message": str(e)
-            }
+            },
         }, status_code=200)
 
 @app.post("/sse")
@@ -1554,14 +1553,14 @@ async def sse_endpoint(request: Request):
                     "capabilities": {
                         "tools": {
                             "listChanged": True
-                        }
+                        },
                     },
                     "serverInfo": {
                         "name": "fill-sign-send-mcp-server",
                         "version": "1.0.0"
-                    }
-                }
-            })
+                    },
+                },
+            },)
         
         elif data.get("method") == "tools/call":
             tool_name = data.get("params", {}).get("name")
@@ -1577,10 +1576,10 @@ async def sse_endpoint(request: Request):
                             {
                                 "type": "text",
                                 "text": json.dumps(result)
-                            }
+                            },
                         ]
-                    }
-                })
+                    },
+                },)
             else:
                 return JSONResponse(content={
                     "jsonrpc": "2.0",
@@ -1588,8 +1587,8 @@ async def sse_endpoint(request: Request):
                     "error": {
                         "code": -32601,
                         "message": f"Tool '{tool_name}' not found"
-                    }
-                })
+                    },
+                },)
         
         else:
             return JSONResponse(content={
@@ -1598,8 +1597,8 @@ async def sse_endpoint(request: Request):
                 "error": {
                     "code": -32601,
                     "message": f"Method '{data.get('method')}' not found"
-                }
-            })
+                },
+            },)
             
     except Exception as e:
         logger.error(f"❌ SSE POST error: {e}")
@@ -1609,7 +1608,7 @@ async def sse_endpoint(request: Request):
             "error": {
                 "code": -32603,
                 "message": str(e)
-            }
+            },
         }, status_code=200)
 
 

@@ -455,6 +455,7 @@ def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code
         recipient_view_request = RecipientViewRequest(
             authentication_method="none",
             email=valid_recipient.email,
+            user_name=valid_recipient.name or valid_recipient.email,
             return_url="https://docusign.com"
         )
         

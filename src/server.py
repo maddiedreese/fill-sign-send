@@ -138,7 +138,8 @@ def handle_get_server_info(args):
 def handle_fill_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle filling a DocuSign envelope with data."""
     try:
-        envelope_id = args.get("envelope_id")
+        # Handle both parameter formats: Poke uses pdf_url, we expect envelope_id
+        envelope_id = args.get("envelope_id") or args.get("pdf_url")
         field_data = args.get("field_data", {})
         
         if not envelope_id:
@@ -179,8 +180,9 @@ def handle_fill_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
 def handle_sign_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle signing a DocuSign envelope."""
     try:
-        envelope_id = args.get("envelope_id")
-        recipient_email = args.get("recipient_email")
+        # Handle both parameter formats: Poke uses pdf_url/signer_email, we expect envelope_id/recipient_email
+        envelope_id = args.get("envelope_id") or args.get("pdf_url")
+        recipient_email = args.get("recipient_email") or args.get("signer_email")
         security_code = args.get("security_code")
         
         if not envelope_id:
@@ -226,8 +228,9 @@ def handle_sign_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
 def handle_submit_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle submitting a DocuSign envelope."""
     try:
-        envelope_id = args.get("envelope_id")
-        
+        # Handle both parameter formats: Poke uses pdf_url, we expect envelope_id
+        envelope_id = args.get("envelope_id") or args.get("pdf_url")
+                
         if not envelope_id:
             return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
         
@@ -1458,7 +1461,9 @@ async def mcp_endpoint(request: Request):
             
     except Exception as e:
         # Catch-all for any unknown methods
-        logger.warning(f"⚠️  Unknown MCP method: {data.get("method")} - defaulting to tools/list")
+        # Catch-all for any unknown methods
+        method = data.get("method")
+        logger.warning(f"⚠️  Unknown MCP method: {method} - defaulting to tools/list")
         return JSONResponse(content={
             "jsonrpc": "2.0",
             "id": data.get("id"),

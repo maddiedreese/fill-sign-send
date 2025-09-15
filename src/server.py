@@ -503,10 +503,15 @@ def download_file_from_url(url):
         logger.error(f"❌ Failed to download file: {e}")
         return None
 
-if __name__ == "__main__":
+async def main():
+    """Main async function to run the FastMCP server."""
     logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server with FastMCP...")
     logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
     
     # Run the FastMCP server as a web server for Render deployment
-    mcp.run(host="0.0.0.0", port=8000)
+    await mcp.run_sse_async(host="0.0.0.0", port=8000)
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())

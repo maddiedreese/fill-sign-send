@@ -521,6 +521,7 @@ if __name__ == "__main__":
     logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
     logger.info(f"🌐 Starting FastMCP server on {host}:{port}")
+    logger.info(f"🔧 Server version: 1.0.1 - Fixed timeout parameters")
     
     try:
         # Run the FastMCP server with improved configuration

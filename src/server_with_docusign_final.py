@@ -133,6 +133,14 @@ async def call_tool(tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         if tool_name == "getenvelope":
             envelope_id = args.get("envelope_id")
             if not envelope_id:
+                # Try to use real DocuSign API
+            try:
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
+                logger.info(f"🔍 POKE DEBUG: Real DocuSign result: {result}")
+                return result
+            except ImportError as e:
+                logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
                 return {"success": False, "error": "envelope_id is required"}
             
             # Try to use real DocuSign API
@@ -144,92 +152,121 @@ async def call_tool(tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             except ImportError as e:
                 logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
                 return {
-                    "success": True,
-                    "envelope_id": envelope_id,
-                    "status": "sent",
-                    "message": "Mock envelope status - DocuSign integration not available"
-                }
+                "success": True,
+                "envelope_id": envelope_id,
+                "status": "sent",
+                "message": "Mock envelope status - DocuSign integration not available"
+            }
         
         elif tool_name == "fill_envelope":
             envelope_id = args.get("envelope_id")
             field_data = args.get("field_data", {})
             if not envelope_id:
+                # Try to use real DocuSign API
+            try:
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
+                logger.info(f"🔍 POKE DEBUG: Real DocuSign result: {result}")
+                return result
+            except ImportError as e:
+                logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
                 return {"success": False, "error": "envelope_id is required"}
             
             # Try to use real DocuSign API
             try:
-                from esign_docusign import fill_envelope_docusign
-                result = fill_envelope_docusign(envelope_id, field_data)
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
                 logger.info(f"🔍 POKE DEBUG: Real DocuSign result: {result}")
                 return result
             except ImportError as e:
                 logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
                 return {
-                    "success": True,
-                    "message": "Mock envelope filled - DocuSign integration not available"
-                }
+                "success": True,
+                "message": "Mock envelope filled - DocuSign integration not available locally"
+            }
         
         elif tool_name == "sign_envelope":
             envelope_id = args.get("envelope_id")
             recipient_email = args.get("recipient_email")
             security_code = args.get("security_code")
             if not envelope_id or not recipient_email or not security_code:
+                # Try to use real DocuSign API
+            try:
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
+                logger.info(f"🔍 POKE DEBUG: Real DocuSign result: {result}")
+                return result
+            except ImportError as e:
+                logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
                 return {"success": False, "error": "envelope_id, recipient_email, and security_code are required"}
             
             # Try to use real DocuSign API
             try:
-                from esign_docusign import sign_envelope_docusign
-                result = sign_envelope_docusign(envelope_id, recipient_email, security_code)
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
                 logger.info(f"🔍 POKE DEBUG: Real DocuSign result: {result}")
                 return result
             except ImportError as e:
                 logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
                 return {
-                    "success": True,
-                    "message": "Mock envelope signed - DocuSign integration not available"
-                }
+                "success": True,
+                "message": "Mock envelope signed - DocuSign integration not available locally"
+            }
         
         elif tool_name == "create_demo_envelope":
             recipient_email = args.get("recipient_email")
             recipient_name = args.get("recipient_name")
             if not recipient_email or not recipient_name:
+                # Try to use real DocuSign API
+            try:
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
+                logger.info(f"🔍 POKE DEBUG: Real DocuSign result: {result}")
+                return result
+            except ImportError as e:
+                logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
                 return {"success": False, "error": "recipient_email and recipient_name are required"}
             
             # Try to use real DocuSign API
             try:
-                from esign_docusign import create_demo_envelope_docusign
-                result = create_demo_envelope_docusign(recipient_email, recipient_name)
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
                 logger.info(f"🔍 POKE DEBUG: Real DocuSign result: {result}")
                 return result
             except ImportError as e:
                 logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
                 return {
-                    "success": True,
-                    "envelope_id": "mock-envelope-123",
-                    "message": "Mock demo envelope created - DocuSign integration not available"
-                }
+                "success": True,
+                "envelope_id": "mock-envelope-123",
+                "message": "Mock demo envelope created - DocuSign integration not available locally"
+            }
         
         elif tool_name == "debug_docusign":
             # Try to use real DocuSign API
             try:
-                from settings import settings
-                return {
-                    "success": True,
-                    "environment": settings.ENVIRONMENT,
-                    "docusign_configured": settings.validate_docusign_config(),
-                    "message": "DocuSign configuration debug info"
-                }
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
+                logger.info(f"🔍 POKE DEBUG: Real DocuSign result: {result}")
+                return result
             except ImportError as e:
                 logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
                 return {
-                    "success": True,
-                    "environment": "local",
-                    "docusign_configured": False,
-                    "message": "Mock DocuSign configuration - running locally without DocuSign integration"
-                }
+                "success": True,
+                "environment": "local",
+                "docusign_configured": False,
+                "message": "Mock DocuSign configuration - running locally without DocuSign integration"
+            }
         
         else:
-            return {"success": False, "error": f"Unknown tool: {tool_name}"}
+            # Try to use real DocuSign API
+            try:
+                from esign_docusign import get_envelope_status_docusign
+                result = get_envelope_status_docusign(envelope_id)
+                logger.info(f"🔍 POKE DEBUG: Real DocuSign result: {result}")
+                return result
+            except ImportError as e:
+                logger.warning(f"⚠️ DocuSign not available: {e}, using mock response")
+                return {"success": False, "error": f"Unknown tool: {tool_name}"}
     
     except Exception as e:
         logger.error(f"❌ Error calling tool {tool_name}: {e}")
@@ -327,15 +364,6 @@ async def handle_mcp_request(request: Request):
                 "result": result
             })
         
-        elif method == "notifications/initialized":
-            # Handle the notifications/initialized method that Poke sends
-            logger.info("🔍 POKE DEBUG: Received notifications/initialized - no response needed")
-            return create_sse_response({
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "result": {}
-            })
-        
         else:
             logger.warning(f"⚠️ Unknown method from Poke: {method}")
             return create_sse_response({
@@ -355,5 +383,5 @@ async def handle_mcp_request(request: Request):
         })
 
 if __name__ == "__main__":
-    logger.info("Starting DocuSign-integrated SSE-compatible MCP server on 0.0.0.0:8000")
+    logger.info("Starting enhanced SSE-compatible MCP server on 0.0.0.0:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)

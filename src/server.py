@@ -1297,7 +1297,7 @@ async def mcp_endpoint(request: Request):
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"}
+                                    "envelope_id": {"type": "string", "description": "DocuSign envelope ID"},
                                 },
                                 "required": ["envelope_id"]
                             }

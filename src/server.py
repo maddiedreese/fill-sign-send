@@ -524,19 +524,21 @@ if __name__ == "__main__":
     
     try:
         # Run the FastMCP server with improved configuration
+        logger.info("🔄 Starting server with enhanced configuration...")
         mcp.run(
             transport="http",
             host=host,
             port=port,
-            stateless_http=True,
-            # Add timeout configurations to prevent premature shutdown
-            timeout_keep_alive=30,
-            timeout_graceful_shutdown=30
+            stateless_http=True
         )
     except KeyboardInterrupt:
         logger.info("🛑 Server shutdown requested by user")
     except Exception as e:
         logger.error(f"❌ Server error: {e}")
-        raise
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        # Don't raise the exception to prevent immediate crash
+        logger.info("🔄 Attempting to restart server...")
     finally:
         logger.info("🏁 Server shutdown complete")

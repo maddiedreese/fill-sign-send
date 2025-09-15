@@ -258,10 +258,54 @@ def handle_submit_envelope(args: Dict[str, Any]) -> Dict[str, Any]:
                 return {"success": False, "error": str(e), "message": "Failed to submit envelope"}
         else:
             return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+
             
     except Exception as e:
         logger.error(f"❌ submit_envelope error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to submit envelope"}
+def handle_complete_signing(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle completing document signing."""
+    try:
+        # Handle both parameter formats: Poke uses pdf_url/signer_email, we expect envelope_id/recipient_email
+        envelope_id = args.get("envelope_id") or args.get("pdf_url")
+        recipient_email = args.get("recipient_email") or args.get("signer_email")
+        signature_data = args.get("signature_data")
+        
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
+        
+        if not recipient_email:
+            return {"success": False, "error": "recipient_email is required", "message": "Please provide recipient_email"}
+        
+        logger.info(f"✍️ complete_signing called with envelope_id: {envelope_id}, recipient_email: {recipient_email}")
+        
+        if USE_REAL_APIS:
+            logger.info("🔗 Using REAL DocuSign API")
+            try:
+                from esign_docusign import complete_document_signing
+                result = complete_document_signing(envelope_id, recipient_email, signature_data)
+                
+                logger.info(f"✍️ DocuSign result: {result}")
+                
+                if result.get("success"):
+                    return {"success": True, "envelope_id": result["envelope_id"], "status": result["status"], "message": result["message"]}
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.error(f"❌ DocuSign API error: {error_msg}")
+                    return {"success": False, "error": error_msg, "message": "Failed to complete signing"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return {"success": False, "error": str(e), "message": "Failed to complete signing"}
+        else:
+            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+
+            
+    except Exception as e:
+        logger.error(f"❌ complete_signing error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to complete signing"}
 
 def handle_getenvelope(args: Dict[str, Any]) -> Dict[str, Any]:
     """Handle getting DocuSign envelope from link or security code."""
@@ -975,7 +1019,6 @@ def handle_access_document_with_code(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e), "message": "Failed to access document with access code"}
 
 def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle complete DocuSign workflow: extract from email, access document, fill, sign, and send."""
     try:
         email_content = args.get("email_content", "")
         recipient_email = args.get("recipient_email", "")
@@ -986,9 +1029,6 @@ def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
             return {"success": False, "error": "email_content is required", "message": "Please provide email_content"}
         
         logger.info(f"🔄 complete_docusign_workflow called with email_content length: {len(email_content)}")
-        
-        # Step 1: Extract envelope ID and access code from email
-        logger.info("🔍 Step 1: Extracting envelope ID and access code from email...")
         extraction_result = handle_extract_envelope_and_access_code({"email_content": email_content})
         
         if not extraction_result.get("success"):
@@ -1091,12 +1131,8 @@ def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
                 "Check envelope status for completion"
             ]
         }
-        
     except Exception as e:
         logger.error(f"❌ complete_docusign_workflow error: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return {"success": False, "error": str(e), "message": "Failed to complete DocuSign workflow"}
 
 # Update TOOL_HANDLERS with all handler functions
 TOOL_HANDLERS.update({
@@ -1116,7 +1152,8 @@ TOOL_HANDLERS.update({
     "extract_envelope_and_access_code": handle_extract_envelope_and_access_code,
     "create_recipient_view_with_code": handle_create_recipient_view_with_code,
     "access_document_with_code": handle_access_document_with_code,
-    "complete_docusign_workflow": handle_complete_docusign_workflow
+    "complete_docusign_workflow": handle_complete_docusign_workflow,
+    "complete_signing": handle_complete_signing
 })
 
 def create_test_pdf():
@@ -1405,8 +1442,7 @@ async def mcp_endpoint(request: Request):
                         },
                         {
                             "name": "complete_docusign_workflow",
-                            "description": "Complete DocuSign workflow: extract envelope ID and access code from email, then fill, sign, and send document",
-                            "inputSchema": {
+    "complete_signing": handle_complete_signing,                            "inputSchema": {
                                 "type": "object",
                                 "properties": {
                                     "email_content": {"type": "string", "description": "Full DocuSign email content containing envelope ID and access code"},
@@ -1683,8 +1719,7 @@ async def sse_endpoint(request: Request):
                         },
                         {
                             "name": "complete_docusign_workflow",
-                            "description": "Complete DocuSign workflow: extract envelope ID and access code from email, then fill, sign, and send document",
-                            "inputSchema": {
+    "complete_signing": handle_complete_signing,                            "inputSchema": {
                                 "type": "object",
                                 "properties": {
                                     "email_content": {"type": "string", "description": "Full DocuSign email content containing envelope ID and access code"},
@@ -1762,3 +1797,5 @@ if __name__ == "__main__":
         import traceback
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise
+
+

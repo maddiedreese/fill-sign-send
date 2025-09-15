@@ -4,3 +4,5 @@ docusign-esign>=5.3.0
 PyJWT>=2.0.0
 python-dotenv>=1.0.0
 requests>=2.25.0
+reportlab>=4.0.0
+cryptography>=40.0.0

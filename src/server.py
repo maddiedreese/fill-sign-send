@@ -508,5 +508,5 @@ if __name__ == "__main__":
     logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
     
-    # Run the FastMCP server
-    mcp.run()
+    # Run the FastMCP server as a web server for Render deployment
+    mcp.run(host="0.0.0.0", port=8000)

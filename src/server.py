@@ -1219,18 +1219,21 @@ async def mcp_endpoint(request: Request):
         content_type = request.headers.get("content-type", "Not set")
         user_agent = request.headers.get("user-agent", "Not set")
         logger.info(f"🔍 DEBUG: Content-Type: {content_type}")
-        logger.info(f"🔍 DEBUG: User-Agent: {user_agent}")        # Validate required MCP fields
+        # Make jsonrpc field optional for Poke compatibility
         if not data.get("jsonrpc"):
-            logger.error(f"❌ Missing jsonrpc field in MCP request")
+            data["jsonrpc"] = "2.0"  # Default to MCP 2.0
+            logger.info("🔧 Added default jsonrpc field for Poke compatibility")
+        
+        if not data.get("method"):
+            logger.error(f"❌ Missing method field in MCP request")
             return JSONResponse(content={
                 "jsonrpc": "2.0",
                 "id": data.get("id"),
                 "error": {
                     "code": -32600,
-                    "message": "Invalid Request: Missing jsonrpc field"
+                    "message": "Invalid Request: Missing method field"
                 }
-            }, status_code=200)
-        
+            }, status_code=200)        
         if not data.get("method"):
             logger.error(f"❌ Missing method field in MCP request")
             return JSONResponse(content={

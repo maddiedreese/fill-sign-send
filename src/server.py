@@ -1484,6 +1484,29 @@ async def sse_endpoint(request: Request):
         logger.info(f"🔍 DEBUG: Raw body: {body}")
         logger.info(f"🔍 DEBUG: Request URL: {request.url}")
         
+        # Validate required MCP fields
+        if not data.get("jsonrpc"):
+            logger.error(f"❌ Missing jsonrpc field in SSE MCP request")
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request: Missing jsonrpc field"
+                }
+            }, status_code=400)
+        
+        if not data.get("method"):
+            logger.error(f"❌ Missing method field in SSE MCP request")
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request: Missing method field"
+                }
+            }, status_code=400)
+        
         # Handle MCP protocol messages
         if data.get("method") == "initialize":
             return JSONResponse(content={

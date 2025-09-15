@@ -1179,11 +1179,47 @@ async def mcp_endpoint(request: Request):
     """MCP protocol endpoint for tool calls."""
     try:
         body = await request.body()
-        data = json.loads(body) if body else {}
+        try:
+            data = json.loads(body) if body else {}
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Invalid JSON in MCP request: {e}")
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {
+                    "code": -32700,
+                    "message": "Parse error: Invalid JSON"
+                }
+            }, status_code=400)
         
         logger.info(f"📡 MCP POST request from {request.client.host}")
         logger.info(f"🔍 DEBUG: Headers: {dict(request.headers)}")
         logger.info(f"🔍 DEBUG: Body: {data}")
+        logger.info(f"🔍 DEBUG: Raw body: {body}")
+        logger.info(f"🔍 DEBUG: Request URL: {request.url}")
+        
+        # Validate required MCP fields
+        if not data.get("jsonrpc"):
+            logger.error(f"❌ Missing jsonrpc field in MCP request")
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request: Missing jsonrpc field"
+                }
+            }, status_code=400)
+        
+        if not data.get("method"):
+            logger.error(f"❌ Missing method field in MCP request")
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request: Missing method field"
+                }
+            }, status_code=400)
         
         # Handle MCP protocol messages
         if data.get("method") == "initialize":

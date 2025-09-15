@@ -1390,7 +1390,7 @@ async def mcp_endpoint(request: Request):
                         "content": [
                             {
                                 "type": "text",
-                                "text": str(result)
+                                "text": json.dumps(result)
                             }
                         ]
                     }
@@ -1644,7 +1644,7 @@ async def sse_endpoint(request: Request):
                         "content": [
                             {
                                 "type": "text",
-                                "text": str(result)
+                                "text": json.dumps(result)
                             }
                         ]
                     }

@@ -2,9 +2,8 @@ services:
   - type: web
     name: fill-sign-send
     runtime: python
-    pythonVersion: "3.11"
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: python3.11 src/server.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: python src/server.py
     plan: free
     autoDeploy: false
     envVars:

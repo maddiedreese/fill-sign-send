@@ -1283,6 +1283,15 @@ async def mcp_endpoint(request: Request):
                             }
                         },
                         {
+                            "name": "get_server_info",
+                            "description": "Get server information and configuration status",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {},
+                                "required": []
+                            }
+                        },
+                        {
                             "name": "debug_docusign_config",
                             "description": "Debug DocuSign configuration and environment settings",
                             "inputSchema": {
@@ -1534,6 +1543,15 @@ async def sse_endpoint(request: Request):
                                     "security_code": {"type": "string", "description": "Security code for signing (optional)"}
                                 },
                                 "required": ["envelope_id", "recipient_email"]
+                            }
+                        },
+                        {
+                            "name": "get_server_info",
+                            "description": "Get server information and configuration status",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {},
+                                "required": []
                             }
                         },
                         {

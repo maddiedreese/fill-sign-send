@@ -504,10 +504,18 @@ def download_file_from_url(url):
         return None
 
 if __name__ == "__main__":
-    import asyncio
+    port = int(os.environ.get("PORT", 8000))
+    host = "0.0.0.0"
+    
     logger.info(f"🚀 Starting Doc Filling + E-Signing MCP Server with FastMCP...")
     logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
+    logger.info(f"🌐 Starting FastMCP server on {host}:{port}")
     
-    # Run the FastMCP server as an HTTP server for Render deployment
-    asyncio.run(mcp.run_http_async(host="0.0.0.0", port=8000))
+    # Run the FastMCP server using the template's correct configuration
+    mcp.run(
+        transport="http",
+        host=host,
+        port=port,
+        stateless_http=True
+    )

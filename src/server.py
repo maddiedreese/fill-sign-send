@@ -1173,6 +1173,25 @@ async def debug_post_endpoint(request: Request):
     return {"message": "Debug POST endpoint", "client_ip": str(request.client.host), "body": body.decode() if body else "No body"}
     return {"message": "Doc Filling + E-Signing MCP Server", "status": "running"}
 
+@app.get("/mcp")
+async def mcp_get_endpoint(request: Request):
+    """MCP GET endpoint for initialization."""
+    return JSONResponse(content={
+        "jsonrpc": "2.0",
+        "id": None,
+        "result": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "tools": {
+                    "listChanged": True
+                }
+            },
+            "serverInfo": {
+                "name": "fill-sign-send-mcp-server",
+                "version": "1.0.0"
+            }
+        }
+    })
 @app.post("/mcp")
 async def mcp_endpoint(request: Request):
     """MCP protocol endpoint for tool calls."""

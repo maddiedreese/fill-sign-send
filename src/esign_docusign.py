@@ -344,6 +344,52 @@ def fill_envelope_docusign(envelope_id: str, field_data: Dict[str, Any]) -> Dict
             "message": "Failed to fill envelope"
         }
 
+def get_envelope_recipients_docusign(envelope_id: str) -> Dict[str, Any]:
+    """
+    Get the recipients of a DocuSign envelope.
+    
+    Args:
+        envelope_id: ID of the envelope
+        
+    Returns:
+        Dictionary with recipient information
+    """
+    try:
+        logger.info(f"📋 Getting recipients for envelope {envelope_id}")
+        
+        # Get authenticated API client
+        api_client = _docusign_client.get_api_client()
+        envelopes_api = EnvelopesApi(api_client)
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        
+        # Get envelope recipients
+        recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
+        
+        recipient_list = []
+        for signer in recipients.signers:
+            recipient_list.append({
+                "email": signer.email,
+                "name": signer.name,
+                "status": signer.status,
+                "recipient_id": signer.recipient_id,
+                "client_user_id": signer.client_user_id
+            })
+        
+        return {
+            "success": True,
+            "envelope_id": envelope_id,
+            "recipients": recipient_list,
+            "message": f"Found {len(recipient_list)} recipients for envelope {envelope_id}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting envelope recipients: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to get envelope recipients"
+        }
+
 def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code: str = None) -> Dict[str, Any]:
     """
     Sign a DocuSign envelope using security code or get signing URL.
@@ -376,14 +422,31 @@ def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code
         
         # If security code provided, authenticate and sign
         if security_code:
+            # First, get the envelope recipients to validate the email
+            recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
+            
+            # Check if the recipient email exists in the envelope
+            valid_recipient = None
+            for signer in recipients.signers:
+                if signer.email.lower() == recipient_email.lower():
+                    valid_recipient = signer
+                    break
+            
+            if not valid_recipient:
+                return {
+                    "success": False,
+                    "error": f"Recipient {recipient_email} is not a valid recipient of envelope {envelope_id}",
+                    "message": "The recipient email is not associated with this envelope"
+                }
+            
             # Create recipient view request
             from docusign_esign.models import RecipientViewRequest
             
             recipient_view_request = RecipientViewRequest(
                 authentication_method="none",
                 email=recipient_email,
-                user_name=recipient_email,
-                client_user_id=recipient_email,
+                user_name=valid_recipient.name or recipient_email,
+                client_user_id=valid_recipient.client_user_id or recipient_email,
                 return_url="https://docusign.com"
             )
             

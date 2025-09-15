@@ -888,26 +888,26 @@ def handle_extract_envelope_and_access_code(args: Dict[str, Any]) -> Dict[str, A
                 "access_code": filtered_access_codes[0],
                 "message": f"Found envelope ID: {unique_envelope_ids[0]} and access code: {filtered_access_codes[0]}",
                 "ready_for_workflow": True
-            },)
+            })
         elif unique_envelope_ids:
             result.update({
                 "envelope_id": unique_envelope_ids[0],
                 "message": f"Found envelope ID: {unique_envelope_ids[0]} but no access code",
                 "ready_for_workflow": False
-            },)
+            })
         elif filtered_access_codes:
             result.update({
                 "access_code": filtered_access_codes[0],
                 "message": f"Found access code: {filtered_access_codes[0]} but no envelope ID",
                 "ready_for_workflow": False
-            },)
+            })
         else:
             result.update({
                 "success": False,
                 "error": "No envelope ID or access code found",
                 "message": "Could not find envelope ID or access code in email content",
                 "ready_for_workflow": False
-            },)
+            })
         
         logger.info(f"🔍 Extraction result: {result}")
         return result
@@ -1083,7 +1083,7 @@ def handle_complete_docusign_workflow(args: Dict[str, Any]) -> Dict[str, Any]:
             fill_result = handle_fill_document_fields({
                 "envelope_id": envelope_id,
                 "field_data": field_data
-            },)
+            })
             
             if not fill_result.get("success"):
                 logger.warning(f"⚠️ Step 3 failed: {fill_result.get('error')}")
@@ -1223,7 +1223,7 @@ async def mcp_get_endpoint(request: Request):
             "capabilities": {
                 "tools": {
                     "listChanged": True
-                },
+                }
             },
             "serverInfo": {
                 "name": "fill-sign-send-mcp-server",
@@ -1246,7 +1246,7 @@ async def mcp_endpoint(request: Request):
                 "error": {
                     "code": -32700,
                     "message": "Parse error: Invalid JSON"
-                },
+                }
             }, status_code=200)
         
         logger.info(f"📡 MCP POST request from {request.client.host}")
@@ -1281,8 +1281,8 @@ async def mcp_endpoint(request: Request):
                         "name": "fill-sign-send-mcp-server",
                         "version": "1.0.0"
                     },
-                },
-            },)
+                }
+            })
         
         elif data.get("method") == "tools/list":
             return JSONResponse(content={
@@ -1454,8 +1454,8 @@ async def mcp_endpoint(request: Request):
                             },
                         },
                     ]
-                },
-            },)
+                }
+            })
         
         elif data.get("method") == "tools/call":
             tool_name = data.get("params", {}).get("name")
@@ -1474,7 +1474,7 @@ async def mcp_endpoint(request: Request):
                             },
                         ]
                     },
-                },)
+                })
             else:
                 return JSONResponse(content={
                     "jsonrpc": "2.0",
@@ -1483,7 +1483,7 @@ async def mcp_endpoint(request: Request):
                         "code": -32601,
                         "message": f"Tool '{tool_name}' not found"
                     },
-                },)
+                })
         
         else:
             return JSONResponse(content={
@@ -1492,8 +1492,8 @@ async def mcp_endpoint(request: Request):
                 "error": {
                     "code": -32601,
                     "message": f"Method '{data.get('method')}' not found"
-                },
-            },)
+                }
+            })
             
     except Exception as e:
         # Catch-all for any unknown methods
@@ -1559,8 +1559,8 @@ async def sse_endpoint(request: Request):
                         "name": "fill-sign-send-mcp-server",
                         "version": "1.0.0"
                     },
-                },
-            },)
+                }
+            })
         
         elif data.get("method") == "tools/call":
             tool_name = data.get("params", {}).get("name")
@@ -1579,7 +1579,7 @@ async def sse_endpoint(request: Request):
                             },
                         ]
                     },
-                },)
+                })
             else:
                 return JSONResponse(content={
                     "jsonrpc": "2.0",
@@ -1588,7 +1588,7 @@ async def sse_endpoint(request: Request):
                         "code": -32601,
                         "message": f"Tool '{tool_name}' not found"
                     },
-                },)
+                })
         
         else:
             return JSONResponse(content={
@@ -1597,8 +1597,8 @@ async def sse_endpoint(request: Request):
                 "error": {
                     "code": -32601,
                     "message": f"Method '{data.get('method')}' not found"
-                },
-            },)
+                }
+            })
             
     except Exception as e:
         logger.error(f"❌ SSE POST error: {e}")

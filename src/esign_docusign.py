@@ -450,13 +450,22 @@ def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code
             # Create recipient view request
             from docusign_esign.models import RecipientViewRequest
             
+            logger.info(f"🔍 DEBUG: Creating recipient view for:")
+            logger.info(f"🔍 DEBUG: - email: {recipient_email}")
+            logger.info(f"🔍 DEBUG: - user_name: {valid_recipient.name or recipient_email}")
+            logger.info(f"🔍 DEBUG: - client_user_id: {valid_recipient.client_user_id or recipient_email}")
+            logger.info(f"🔍 DEBUG: - recipient_id: {valid_recipient.recipient_id}")
+            
             recipient_view_request = RecipientViewRequest(
                 authentication_method="none",
                 email=recipient_email,
                 user_name=valid_recipient.name or recipient_email,
                 client_user_id=valid_recipient.client_user_id or recipient_email,
-                return_url="https://docusign.com"
+                return_url="https://docusign.com",
+                recipient_id=valid_recipient.recipient_id
             )
+            
+            logger.info(f"🔍 DEBUG: About to call create_recipient_view with account_id={account_id}, envelope_id={envelope_id}")
             
             # Get recipient view URL
             result = envelopes_api.create_recipient_view(

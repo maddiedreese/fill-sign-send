@@ -511,6 +511,8 @@ if __name__ == "__main__":
     logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
     logger.info(f"🌐 Starting FastMCP server on {host}:{port}")
+    logger.info(f"🔗 MCP endpoint: http://{host}:{port}/mcp")
+    logger.info(f"📱 Poke should connect to: https://fill-sign-send.onrender.com/mcp")
     
     # Add signal handlers to prevent premature shutdown
     import signal

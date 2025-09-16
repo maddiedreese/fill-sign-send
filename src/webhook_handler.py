@@ -12,6 +12,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 import time
 import re
+import requests
 
 # Add the src directory to the Python path
 current_dir = Path(__file__).parent
@@ -39,6 +40,36 @@ try:
 except ImportError as e:
     logger.error(f"⚠️  MCP tools import error: {e}")
     MCP_TOOLS_AVAILABLE = False
+
+def send_message_to_poke(message: str) -> dict:
+    """Send a message back to Poke using the API key"""
+    try:
+        poke_api_key = os.environ.get("POKE_API_KEY")
+        if not poke_api_key:
+            logger.warning("⚠️ POKE_API_KEY not found in environment variables")
+            return {"success": False, "error": "Poke API key not configured"}
+        
+        poke_url = "https://poke.com/api/v1/inbound-sms/webhook"
+        headers = {
+            "Authorization": f"Bearer {poke_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {"message": message}
+        
+        logger.info(f"📤 Sending message to Poke: {message}")
+        response = requests.post(poke_url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            logger.info("✅ Message sent to Poke successfully")
+            return {"success": True, "message": "Message sent to Poke", "response": response.json()}
+        else:
+            logger.error(f"❌ Failed to send message to Poke: {response.status_code} - {response.text}")
+            return {"success": False, "error": f"Poke API error: {response.status_code}", "response": response.text}
+    
+    except Exception as e:
+        logger.error(f"❌ Error sending message to Poke: {e}")
+        return {"success": False, "error": str(e)}
 
 def process_poke_message(message: str) -> dict:
     """Process Poke message and call appropriate MCP tools"""
@@ -71,11 +102,21 @@ def process_poke_message(message: str) -> dict:
                     subject="Document for Signature",
                     message="Please review and sign this document."
                 )
+                
+                # Send response back to Poke
+                if result.get("success"):
+                    response_message = f"✅ Document sent for signature to {recipient_email}. Envelope ID: {result.get('envelope_id', 'N/A')}"
+                else:
+                    response_message = f"❌ Failed to send document: {result.get('error', 'Unknown error')}"
+                
+                poke_response = send_message_to_poke(response_message)
+                
                 return {
                     "success": True,
                     "action": "send_for_signature",
                     "result": result,
-                    "message": f"Document sent for signature to {recipient_email}"
+                    "message": f"Document sent for signature to {recipient_email}",
+                    "poke_response": poke_response
                 }
             else:
                 return {
@@ -91,11 +132,22 @@ def process_poke_message(message: str) -> dict:
             if envelope_match:
                 envelope_id = envelope_match.group(1)
                 result = get_envelope_status(envelope_id)
+                
+                # Send response back to Poke
+                if result.get("success"):
+                    status = result.get("status", "Unknown")
+                    response_message = f"📊 Envelope {envelope_id} status: {status}"
+                else:
+                    response_message = f"❌ Failed to get envelope status: {result.get('error', 'Unknown error')}"
+                
+                poke_response = send_message_to_poke(response_message)
+                
                 return {
                     "success": True,
                     "action": "get_envelope_status",
                     "result": result,
-                    "message": f"Retrieved status for envelope {envelope_id}"
+                    "message": f"Retrieved status for envelope {envelope_id}",
+                    "poke_response": poke_response
                 }
             else:
                 return {
@@ -107,11 +159,22 @@ def process_poke_message(message: str) -> dict:
         elif "extract code" in message_lower or "access code" in message_lower:
             logger.info("🔍 Detected extract access code command")
             result = extract_access_code(message)
+            
+            # Send response back to Poke
+            if result.get("success"):
+                access_code = result.get("access_code", "N/A")
+                response_message = f"🔍 Extracted access code: {access_code}"
+            else:
+                response_message = f"❌ Failed to extract access code: {result.get('error', 'Unknown error')}"
+            
+            poke_response = send_message_to_poke(response_message)
+            
             return {
                 "success": True,
                 "action": "extract_access_code",
                 "result": result,
-                "message": "Extracted access code from message"
+                "message": "Extracted access code from message",
+                "poke_response": poke_response
             }
         
         elif "complete workflow" in message_lower or "docusign workflow" in message_lower:
@@ -127,15 +190,30 @@ def process_poke_message(message: str) -> dict:
         elif "server info" in message_lower or "status" in message_lower:
             logger.info("📊 Detected server info command")
             result = get_server_info()
+            
+            # Send response back to Poke
+            if result.get("success"):
+                server_name = result.get("server", {}).get("name", "Unknown")
+                server_status = result.get("server", {}).get("status", "Unknown")
+                response_message = f"📊 Server: {server_name} - Status: {server_status}"
+            else:
+                response_message = f"❌ Failed to get server info: {result.get('error', 'Unknown error')}"
+            
+            poke_response = send_message_to_poke(response_message)
+            
             return {
                 "success": True,
                 "action": "get_server_info",
                 "result": result,
-                "message": "Retrieved server information"
+                "message": "Retrieved server information",
+                "poke_response": poke_response
             }
         
         else:
             # Default response for unrecognized commands
+            help_message = "Available commands:\n• send document [email]\n• envelope status [envelope_id]\n• extract code\n• complete workflow\n• server info"
+            poke_response = send_message_to_poke(help_message)
+            
             return {
                 "success": True,
                 "action": "echo",
@@ -146,7 +224,8 @@ def process_poke_message(message: str) -> dict:
                     "extract code - Extract access code from message",
                     "complete workflow - Complete DocuSign workflow",
                     "server info - Get server information"
-                ]
+                ],
+                "poke_response": poke_response
             }
     
     except Exception as e:

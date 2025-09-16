@@ -351,8 +351,8 @@ def complete_signing(envelope_id: str, recipient_email: str, security_code: str 
         if USE_REAL_APIS:
             logger.info("🔗 Using REAL DocuSign API")
             try:
-                from esign_docusign import sign_envelope_docusign
-                result = sign_envelope_docusign(envelope_id, recipient_email, security_code)
+                from esign_docusign import complete_signing_docusign
+                result = complete_signing_docusign(envelope_id, recipient_email, security_code)
                 
                 logger.info(f"✍️ DocuSign result: {result}")
                 

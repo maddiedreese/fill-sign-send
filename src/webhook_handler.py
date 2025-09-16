@@ -192,7 +192,11 @@ def process_poke_message(message: str) -> dict:
                 
                 # Send response back to Poke
                 if result.get("success"):
-                    response_message = f"✍️ Document signing completed for envelope {envelope_id}"
+                    if result.get("requires_human_interaction"):
+                        signing_url = result.get("signing_url", "N/A")
+                        response_message = f"✍️ Form fields pre-filled! Signing URL generated for envelope {envelope_id}. Recipient must open this URL to place their signature: {signing_url}"
+                    else:
+                        response_message = f"✍️ Document signing completed for envelope {envelope_id}"
                 else:
                     response_message = f"❌ Failed to complete signing: {result.get('error', 'Unknown error')}"
                 

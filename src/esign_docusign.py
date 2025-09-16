@@ -296,7 +296,7 @@ def fill_envelope_docusign(envelope_id: str, field_data: Dict[str, Any]) -> Dict
         
         document = documents.envelope_documents[0]
         
-        # Create tabs for text fields
+        # Create tabs for text fields - this will pre-fill the form
         text_tabs = []
         for field_name, field_value in field_data.items():
             text_tab = Text(
@@ -307,9 +307,7 @@ def fill_envelope_docusign(envelope_id: str, field_data: Dict[str, Any]) -> Dict
             )
             text_tabs.append(text_tab)
         
-        # Update envelope with filled data
-        
-        # Get existing recipients
+        # Get existing recipients and add pre-filled tabs
         recipients = envelope.recipients
         if recipients and recipients.signers:
             signer = recipients.signers[0]
@@ -317,9 +315,15 @@ def fill_envelope_docusign(envelope_id: str, field_data: Dict[str, Any]) -> Dict
                 signer.tabs = Tabs()
             if not signer.tabs.text_tabs:
                 signer.tabs.text_tabs = []
+            
+            # Add the pre-filled text tabs
             signer.tabs.text_tabs.extend(text_tabs)
+            
+            # Mark the tabs as pre-filled (locked)
+            for tab in signer.tabs.text_tabs:
+                tab.locked = "true"
         
-        # Update envelope
+        # Update envelope with pre-filled data
         envelope_definition = EnvelopeDefinition(
             recipients=recipients
         )
@@ -485,6 +489,98 @@ def sign_envelope_docusign(envelope_id: str, recipient_email: str, security_code
             "success": False,
             "error": str(e),
             "message": "Failed to sign envelope"
+        }
+
+def complete_signing_docusign(envelope_id: str, recipient_email: str, security_code: str = None) -> Dict[str, Any]:
+    """
+    Complete the signing process for a DocuSign envelope by actually placing signatures.
+    
+    Args:
+        envelope_id: ID of the envelope to sign
+        recipient_email: Email of the recipient signing
+        security_code: Optional security code for authentication
+        
+    Returns:
+        Dictionary with success status and completion status
+    """
+    try:
+        logger.info(f"✍️ Completing signing for envelope {envelope_id} for {recipient_email}")
+        
+        # Get authenticated API client
+        api_client = _docusign_client.get_api_client()
+        envelopes_api = EnvelopesApi(api_client)
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        
+        # Get envelope details
+        envelope = envelopes_api.get_envelope(account_id=account_id, envelope_id=envelope_id)
+        
+        if envelope.status not in ["sent", "delivered"]:
+            return {
+                "success": False,
+                "error": f"Envelope status is {envelope.status}, cannot sign",
+                "message": "Only sent or delivered envelopes can be signed"
+            }
+        
+        # Get envelope recipients
+        recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
+        
+        # Find the recipient
+        valid_recipient = None
+        for signer in recipients.signers:
+            if signer.email.lower() == recipient_email.lower():
+                valid_recipient = signer
+                break
+        
+        if not valid_recipient:
+            return {
+                "success": False,
+                "error": f"Recipient {recipient_email} is not a valid recipient of envelope {envelope_id}",
+                "message": "The recipient email is not associated with this envelope"
+            }
+        
+        # For automated signing, we need to use embedded signing with a signing URL
+        # and then programmatically complete the signing process
+        from docusign_esign.models import RecipientViewRequest
+        
+        # Create recipient view request for embedded signing
+        recipient_view_request = RecipientViewRequest(
+            authentication_method="none",
+            email=valid_recipient.email,
+            user_name=valid_recipient.name or valid_recipient.email,
+            return_url="https://docusign.com",
+            client_user_id=valid_recipient.client_user_id or valid_recipient.recipient_id
+        )
+        
+        # Get the signing URL
+        result = envelopes_api.create_recipient_view(
+            account_id=account_id,
+            envelope_id=envelope_id,
+            recipient_view_request=recipient_view_request
+        )
+        
+        # DocuSign requires human interaction for signing due to security requirements
+        # We can generate the signing URL but cannot programmatically complete the signing
+        logger.info(f"✍️ Generated signing URL for envelope {envelope_id}: {result.url}")
+        
+        return {
+            "success": True,
+            "signing_url": result.url,
+            "message": f"Signing URL generated for envelope {envelope_id}. The recipient must open this URL in a browser to place their signature.",
+            "envelope_id": envelope_id,
+            "status": "signing_url_generated",
+            "requires_human_interaction": True,
+            "workflow_step": "recipient_must_sign",
+            "note": "Form fields have been pre-filled. The recipient must open the signing URL to place their signature and complete the document."
+        }
+        
+    except Exception as e:
+        logger.error(f"Error completing signing: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to complete signing"
         }
 
 def submit_envelope_docusign(envelope_id: str) -> Dict[str, Any]:

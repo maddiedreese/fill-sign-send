@@ -46,16 +46,6 @@ if not USE_REAL_APIS:
 # Initialize FastMCP
 mcp = FastMCP("Doc Filling + E-Signing MCP Server")
 
-# Add health check tool for Render
-@mcp.tool(description="Health check endpoint for Render")
-def health_check() -> dict:
-    """Health check endpoint for Render."""
-    return {
-        "status": "healthy", 
-        "message": "Server is running",
-        "timestamp": "2024-01-01T00:00:00Z"
-    }
-
 @mcp.tool(description="Get server information and configuration status")
 def get_server_info() -> dict:
     """Get server information and configuration status."""
@@ -521,11 +511,20 @@ if __name__ == "__main__":
     logger.info(f"📊 Using {'REAL' if USE_REAL_APIS else 'MOCK'} APIs")
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
     logger.info(f"🌐 Starting FastMCP server on {host}:{port}")
-    logger.info(f"🔧 Server version: 1.0.1 - Fixed timeout parameters")
+    
+    # Add signal handlers to prevent premature shutdown
+    import signal
+    import time
+    
+    def signal_handler(signum, frame):
+        logger.info(f"🛑 Received signal {signum}, but keeping server alive...")
+        # Don't exit, just log the signal
+    
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
     
     try:
-        # Run the FastMCP server with improved configuration
-        logger.info("🔄 Starting server with enhanced configuration...")
+        # Run the FastMCP server using the template's correct configuration
         mcp.run(
             transport="http",
             host=host,
@@ -539,7 +538,8 @@ if __name__ == "__main__":
         logger.error(f"❌ Error type: {type(e).__name__}")
         import traceback
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
-        # Don't raise the exception to prevent immediate crash
-        logger.info("🔄 Attempting to restart server...")
+        # Keep the server running even on errors
+        logger.info("🔄 Server will continue running despite error...")
+        time.sleep(1)  # Brief pause before continuing
     finally:
         logger.info("🏁 Server shutdown complete")

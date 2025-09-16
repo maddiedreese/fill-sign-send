@@ -32,6 +32,7 @@ try:
         extract_access_code,
         getenvelope,
         sign_envelope,
+        complete_signing,
         submit_envelope,
         complete_docusign_workflow
     )
@@ -177,6 +178,40 @@ def process_poke_message(message: str) -> dict:
                 "poke_response": poke_response
             }
         
+        elif "complete signing" in message_lower or "sign document" in message_lower:
+            logger.info("✍️ Detected complete signing command")
+            # Extract envelope ID and email from message
+            envelope_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', message)
+            email_match = re.search(r'(\S+@\S+\.\S+)', message)
+            
+            if envelope_match and email_match:
+                envelope_id = envelope_match.group(1)
+                recipient_email = email_match.group(1)
+                
+                result = complete_signing(envelope_id, recipient_email)
+                
+                # Send response back to Poke
+                if result.get("success"):
+                    response_message = f"✍️ Document signing completed for envelope {envelope_id}"
+                else:
+                    response_message = f"❌ Failed to complete signing: {result.get('error', 'Unknown error')}"
+                
+                poke_response = send_message_to_poke(response_message)
+                
+                return {
+                    "success": True,
+                    "action": "complete_signing",
+                    "result": result,
+                    "message": "Completed document signing",
+                    "poke_response": poke_response
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Missing envelope ID or email",
+                    "message": "Please include both envelope ID and email address"
+                }
+        
         elif "complete workflow" in message_lower or "docusign workflow" in message_lower:
             logger.info("🔄 Detected complete workflow command")
             result = complete_docusign_workflow(message)
@@ -211,7 +246,7 @@ def process_poke_message(message: str) -> dict:
         
         else:
             # Default response for unrecognized commands
-            help_message = "Available commands:\n• send document [email]\n• envelope status [envelope_id]\n• extract code\n• complete workflow\n• server info"
+            help_message = "Available commands:\n• send document [email]\n• envelope status [envelope_id]\n• extract code\n• complete signing [envelope_id] [email]\n• complete workflow\n• server info"
             poke_response = send_message_to_poke(help_message)
             
             return {
@@ -222,6 +257,7 @@ def process_poke_message(message: str) -> dict:
                     "send document [email] - Send document for signature",
                     "envelope status [envelope_id] - Check envelope status",
                     "extract code - Extract access code from message",
+                    "complete signing [envelope_id] [email] - Complete document signing",
                     "complete workflow - Complete DocuSign workflow",
                     "server info - Get server information"
                 ],

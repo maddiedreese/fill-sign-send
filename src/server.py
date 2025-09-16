@@ -336,6 +336,48 @@ def sign_envelope(envelope_id: str, recipient_email: str, security_code: str = "
         logger.error(f"❌ sign_envelope error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to sign envelope"}
 
+@mcp.tool(description="Complete signing process for DocuSign envelope")
+def complete_signing(envelope_id: str, recipient_email: str, security_code: str = "") -> dict:
+    """Complete the signing process for a DocuSign envelope."""
+    try:
+        if not envelope_id:
+            return {"success": False, "error": "envelope_id is required", "message": "Please provide envelope_id"}
+        
+        if not recipient_email:
+            return {"success": False, "error": "recipient_email is required", "message": "Please provide recipient_email"}
+        
+        logger.info(f"✍️ complete_signing called with envelope_id: {envelope_id}, recipient_email: {recipient_email}")
+        
+        if USE_REAL_APIS:
+            logger.info("🔗 Using REAL DocuSign API")
+            try:
+                from esign_docusign import sign_envelope_docusign
+                result = sign_envelope_docusign(envelope_id, recipient_email, security_code)
+                
+                logger.info(f"✍️ DocuSign result: {result}")
+                
+                if result.get("success"):
+                    response = {"success": True, "envelope_id": result["envelope_id"], "message": result["message"]}
+                    if "signing_url" in result:
+                        response["signing_url"] = result["signing_url"]
+                    if "status" in result:
+                        response["status"] = result["status"]
+                    return response
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.error(f"❌ DocuSign API error: {error_msg}")
+                    return {"success": False, "error": error_msg, "message": "Failed to complete signing"}
+                    
+            except Exception as e:
+                logger.error(f"❌ DocuSign API exception: {e}")
+                return {"success": False, "error": str(e), "message": "Failed to complete signing"}
+        else:
+            return {"success": False, "error": "DocuSign not available", "message": "DocuSign integration not available"}
+            
+    except Exception as e:
+        logger.error(f"❌ complete_signing error: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to complete signing"}
+
 @mcp.tool(description="Submit a DocuSign envelope")
 def submit_envelope(envelope_id: str) -> dict:
     """Submit a DocuSign envelope."""

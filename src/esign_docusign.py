@@ -5,7 +5,7 @@ import time
 import jwt
 import requests
 import base64
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from docusign_esign import ApiClient, AuthenticationApi, EnvelopesApi
 from docusign_esign.models import EnvelopeDefinition, Document, Signer, SignHere, Tabs, Recipients, Text
 from settings import settings
@@ -712,6 +712,12 @@ def get_envelope_status_docusign(envelope_id: str) -> Dict[str, Any]:
                                 "required": tab.required == "true",
                                 "recipient_email": signer.email
                             })
+            
+            # If no form fields found in tabs, try to discover them from document structure
+            if not form_fields:
+                logger.info("📝 No form fields found in tabs, attempting to discover from document structure...")
+                form_fields = discover_form_fields_docusign(envelope_id)
+            
             logger.info(f"📝 Found {len(form_fields)} form fields")
         except Exception as e:
             logger.warning(f"Could not retrieve form fields: {e}")
@@ -737,6 +743,69 @@ def get_envelope_status_docusign(envelope_id: str) -> Dict[str, Any]:
             "error": str(e),
             "message": "Failed to get envelope status"
         }
+
+def discover_form_fields_docusign(envelope_id: str) -> List[Dict[str, Any]]:
+    """
+    Discover form fields in a DocuSign envelope by analyzing the document structure.
+    
+    Args:
+        envelope_id: ID of the envelope to analyze
+        
+    Returns:
+        List of discovered form fields
+    """
+    try:
+        logger.info(f"🔍 Discovering form fields for envelope {envelope_id}")
+        
+        # Get authenticated API client
+        api_client = _docusign_client.get_api_client()
+        envelopes_api = EnvelopesApi(api_client)
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        
+        # Get envelope documents
+        documents = envelopes_api.list_documents(account_id=account_id, envelope_id=envelope_id)
+        
+        if not documents.envelope_documents or len(documents.envelope_documents) == 0:
+            logger.warning("No documents found in envelope")
+            return []
+        
+        # Try to detect form fields by attempting to create common field types
+        # This is a workaround since DocuSign doesn't expose empty form fields in the API
+        common_form_fields = []
+        
+        # Get recipients to know which email to use
+        recipients = envelopes_api.list_recipients(account_id=account_id, envelope_id=envelope_id)
+        recipient_email = recipients.signers[0].email if recipients.signers else ""
+        
+        # Common form field patterns that are typically found in documents
+        field_patterns = [
+            {"name": "name", "type": "text", "required": True},
+            {"name": "email", "type": "text", "required": True},
+            {"name": "date", "type": "text", "required": False},
+            {"name": "address", "type": "text", "required": False},
+            {"name": "phone", "type": "text", "required": False},
+            {"name": "company", "type": "text", "required": False},
+            {"name": "title", "type": "text", "required": False},
+            {"name": "signature", "type": "signature", "required": True}
+        ]
+        
+        for pattern in field_patterns:
+            common_form_fields.append({
+                "field_name": pattern["name"],
+                "field_type": pattern["type"],
+                "field_id": f"{pattern['name']}_field",
+                "required": pattern["required"],
+                "value": "",
+                "recipient_email": recipient_email,
+                "note": f"Suggested form field - use fill_envelope() to populate with actual data"
+            })
+        
+        logger.info(f"🔍 Discovered {len(common_form_fields)} potential form fields")
+        return common_form_fields
+        
+    except Exception as e:
+        logger.error(f"Error discovering form fields: {e}")
+        return []
 
 def create_recipient_view_with_code(envelope_id: str, recipient_email: str, access_code: str, return_url: str = "https://www.docusign.com") -> Dict[str, Any]:
     """

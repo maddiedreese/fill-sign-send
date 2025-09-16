@@ -48,3 +48,13 @@ services:
           X6fwkIspd79Ow4vepT0Dpgwn0tWdjlSTXXLZZDsYaUC3OPidpJmFhpg0Xhxs5ozZ
           XoBYSSnMnRX9gI1NB0ApbjL+SOLcCg5z45N64Bncw3AS2xAB
           -----END RSA PRIVATE KEY-----
+  - type: web
+    name: fill-sign-send-webhook
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python src/webhook_handler.py
+    plan: free
+    autoDeploy: false
+    envVars:
+      - key: WEBHOOK_PORT
+        value: "8000"

@@ -465,6 +465,7 @@ def complete_docusign_workflow(email_content: str, recipient_email: str = "", fi
         logger.error(f"❌ complete_docusign_workflow error: {e}")
         return {"success": False, "error": str(e), "message": "Failed to complete DocuSign workflow"}
 
+
 def create_test_pdf():
     """Create a simple test PDF for production"""
     try:
@@ -503,6 +504,7 @@ def download_file_from_url(url):
         logger.error(f"❌ Failed to download file: {e}")
         return None
 
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     host = "0.0.0.0"
@@ -512,6 +514,7 @@ if __name__ == "__main__":
     logger.info(f"🌍 Environment: {settings.ENVIRONMENT}")
     logger.info(f"🌐 Starting FastMCP server on {host}:{port}")
     logger.info(f"🔗 MCP endpoint: http://{host}:{port}/mcp")
+    logger.info(f"📱 For Poke webhooks, you'll need to set up a separate webhook handler")
     logger.info(f"📱 Poke should connect to: https://fill-sign-send.onrender.com/mcp")
     
     # Add signal handlers to prevent premature shutdown
